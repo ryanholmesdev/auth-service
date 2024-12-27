@@ -1,0 +1,61 @@
+openapi: 3.0.0
+info:
+  title: Auth Service API
+  version: 1.0.0
+  description: API for managing OAuth tokens and authentication.
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /auth/{provider}/login:
+    get:
+      summary: Redirect to the provider's OAuth login page.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirects the user to the OAuth provider login page.
+
+  /auth/{provider}/callback:
+    get:
+      summary: Handle OAuth callback and store tokens.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully authenticated.
+
+  /auth/token:
+    get:
+      summary: Retrieve an OAuth token for a specific session.
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Returns the OAuth token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                  refresh_token:
+                    type: string
+        '401':
+          description: Unauthorized access.
