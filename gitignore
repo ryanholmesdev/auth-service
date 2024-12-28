@@ -1,0 +1,22 @@
+# Binaries
+auth-service
+
+# Dependency directories
+vendor/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE/Editor files
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Docker-related files
+*.pid
