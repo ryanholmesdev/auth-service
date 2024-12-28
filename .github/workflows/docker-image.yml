@@ -27,4 +27,4 @@ jobs:
     # Step 4: Run the new container
     - name: Run new container
       run: |
-        docker run -d --name auth-service -p 8080:8080 --env-file /path/to/.env auth-service:latest
+        docker run -d --name auth-service -p 8080:8080 --env-file /home/ryan/actions-runner/.env auth-service:latest
