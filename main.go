@@ -6,12 +6,16 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func main() {
+	// Log the detected HOST environment variable
+	log.Println("Environment variable HOST:", getHost())
+
 	r := chi.NewRouter()
 
 	// Serve the OpenAPI document
@@ -35,9 +39,20 @@ func main() {
 	})
 
 	// Serve the Swagger UI
-	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
-	))
+	r.Get("/swagger/*", func(w http.ResponseWriter, r *http.Request) {
+		host := getHost() // Use the detected host
+		handler := httpSwagger.Handler(
+			httpSwagger.URL("http://" + host + "/swagger/doc.json"),
+		)
+		handler(w, r)
+	})
+
+	// Debug endpoint to check the current host
+	r.Get("/debug/host", func(w http.ResponseWriter, r *http.Request) {
+		host := getHost()
+		log.Println("Current Host:", host)
+		w.Write([]byte("Current Host: " + host))
+	})
 
 	// Create an instance of your server that implements the ServerInterface
 	server := &handlers.Server{}
@@ -45,6 +60,17 @@ func main() {
 	// Use the HandlerFromMux function to register routes
 	r.Mount("/", generated.HandlerFromMux(server, r))
 
-	log.Println("Swagger UI available at http://localhost:8080/swagger/")
+	// Log the Swagger UI URL
+	log.Println("Swagger UI available at http://" + getHost() + "/swagger/")
+
+	// Start the server
 	log.Fatal(http.ListenAndServe(":8080", r))
+}
+
+// getHost retrieves the HOST environment variable or falls back to localhost
+func getHost() string {
+	if host := os.Getenv("HOST"); host != "" {
+		return host
+	}
+	return "localhost:8080" // Default to localhost
 }
