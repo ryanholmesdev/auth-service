@@ -1,18 +1,59 @@
 package main
 
 import (
-	"auth-service/generated" // Import the generated package
+	"auth-service/config"
+	"auth-service/generated"
 	"auth-service/handlers"
+	"auth-service/redisclient"
 	"encoding/json"
+	"github.com/go-chi/cors"
+	"github.com/joho/godotenv"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func main() {
+
+	// Determine the environment
+	appEnv := os.Getenv("APP_ENV")
+	if appEnv == "" {
+		appEnv = "local" // Default to "local" if APP_ENV is not set
+	}
+
+	// Load environment variables from the appropriate file
+	envFile := ".env." + appEnv
+	err := godotenv.Load(envFile)
+	if err != nil {
+		log.Fatalf("Error loading %s file: %v", envFile, err)
+	}
+
+	log.Printf("Environment: %s (loaded %s)", appEnv, envFile)
+
+	// Get Redis address from environment variable
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		log.Fatal("REDIS_ADDR environment variable is not set")
+	}
+
+	config.InitConfig()
+
+	redisclient.InitializeRedis(redisAddr)
+
 	r := chi.NewRouter()
+
+	// Enable CORS
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:5173"}, // Allow your front-end origin
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		ExposedHeaders:   []string{"Content-Length"},
+		AllowCredentials: true, // Allow cookies and credentials
+		MaxAge:           300,  // Cache preflight request for 5 minutes
+	}))
 
 	// Serve the OpenAPI document
 	r.Get("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {

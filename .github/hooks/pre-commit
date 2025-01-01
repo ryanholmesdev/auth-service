@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Run gofmt on all staged .go files
+echo "Running gofmt..."
+unstaged=$(git diff --name-only --diff-filter=d | grep '\.go$')
+
+if [ -n "$unstaged" ]; then
+    gofmt -l $unstaged
+    if [ $? -ne 0 ]; then
+        echo "gofmt detected issues. Aborting commit."
+        exit 1
+    fi
+fi
+
+echo "gofmt passed."
+
+# Run go mod tidy to clean up dependencies
+echo "Running go mod tidy..."
+go mod tidy
+if [ $? -ne 0 ]; then
+    echo "go mod tidy failed. Aborting commit."
+    exit 1
+fi
+
+echo "go mod tidy passed."

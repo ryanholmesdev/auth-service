@@ -17,6 +17,12 @@ paths:
           required: true
           schema:
             type: string
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The URI to redirect the user to after authentication.
       responses:
         '302':
           description: Redirects the user to the OAuth provider login page.
@@ -30,16 +36,22 @@ paths:
           required: true
           schema:
             type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The state parameter containing redirect URI and anti-CSRF token.
       responses:
         '200':
           description: Successfully authenticated.
 
-  /auth/token:
+  /auth/{provider}/token:
     get:
-      summary: Retrieve an OAuth token for a specific session.
+      summary: Retrieve an OAuth token for a specific provider.
       parameters:
-        - name: session_id
-          in: query
+        - name: provider
+          in: path
           required: true
           schema:
             type: string
@@ -57,5 +69,9 @@ paths:
                     type: integer
                   refresh_token:
                     type: string
+        '400':
+          description: Bad request, missing session ID.
         '401':
           description: Unauthorized access.
+        '404':
+          description: Token not found.

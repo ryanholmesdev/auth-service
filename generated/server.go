@@ -18,43 +18,50 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
-// GetAuthTokenParams defines parameters for GetAuthToken.
-type GetAuthTokenParams struct {
-	SessionId string `form:"session_id" json:"session_id"`
+// GetAuthProviderCallbackParams defines parameters for GetAuthProviderCallback.
+type GetAuthProviderCallbackParams struct {
+	// State The state parameter containing redirect URI and anti-CSRF token.
+	State string `form:"state" json:"state"`
+}
+
+// GetAuthProviderLoginParams defines parameters for GetAuthProviderLogin.
+type GetAuthProviderLoginParams struct {
+	// RedirectUri The URI to redirect the user to after authentication.
+	RedirectUri string `form:"redirect_uri" json:"redirect_uri"`
 }
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// Retrieve an OAuth token for a specific session.
-	// (GET /auth/token)
-	GetAuthToken(w http.ResponseWriter, r *http.Request, params GetAuthTokenParams)
 	// Handle OAuth callback and store tokens.
 	// (GET /auth/{provider}/callback)
-	GetAuthProviderCallback(w http.ResponseWriter, r *http.Request, provider string)
+	GetAuthProviderCallback(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderCallbackParams)
 	// Redirect to the provider's OAuth login page.
 	// (GET /auth/{provider}/login)
-	GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, provider string)
+	GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderLoginParams)
+	// Retrieve an OAuth token for a specific provider.
+	// (GET /auth/{provider}/token)
+	GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
 
-// Retrieve an OAuth token for a specific session.
-// (GET /auth/token)
-func (_ Unimplemented) GetAuthToken(w http.ResponseWriter, r *http.Request, params GetAuthTokenParams) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
 // Handle OAuth callback and store tokens.
 // (GET /auth/{provider}/callback)
-func (_ Unimplemented) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request, provider string) {
+func (_ Unimplemented) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderCallbackParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // Redirect to the provider's OAuth login page.
 // (GET /auth/{provider}/login)
-func (_ Unimplemented) GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, provider string) {
+func (_ Unimplemented) GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderLoginParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Retrieve an OAuth token for a specific provider.
+// (GET /auth/{provider}/token)
+func (_ Unimplemented) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -66,41 +73,6 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
-
-// GetAuthToken operation middleware
-func (siw *ServerInterfaceWrapper) GetAuthToken(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetAuthTokenParams
-
-	// ------------- Required query parameter "session_id" -------------
-
-	if paramValue := r.URL.Query().Get("session_id"); paramValue != "" {
-
-	} else {
-		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "session_id"})
-		return
-	}
-
-	err = runtime.BindQueryParameter("form", true, true, "session_id", r.URL.Query(), &params.SessionId)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "session_id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAuthToken(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
 
 // GetAuthProviderCallback operation middleware
 func (siw *ServerInterfaceWrapper) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request) {
@@ -117,8 +89,26 @@ func (siw *ServerInterfaceWrapper) GetAuthProviderCallback(w http.ResponseWriter
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAuthProviderCallbackParams
+
+	// ------------- Required query parameter "state" -------------
+
+	if paramValue := r.URL.Query().Get("state"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "state", r.URL.Query(), &params.State)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAuthProviderCallback(w, r, provider)
+		siw.Handler.GetAuthProviderCallback(w, r, provider, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -143,8 +133,52 @@ func (siw *ServerInterfaceWrapper) GetAuthProviderLogin(w http.ResponseWriter, r
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAuthProviderLoginParams
+
+	// ------------- Required query parameter "redirect_uri" -------------
+
+	if paramValue := r.URL.Query().Get("redirect_uri"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "redirect_uri"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "redirect_uri", r.URL.Query(), &params.RedirectUri)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "redirect_uri", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAuthProviderLogin(w, r, provider)
+		siw.Handler.GetAuthProviderLogin(w, r, provider, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetAuthProviderToken operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthProviderToken(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "provider" -------------
+	var provider string
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "provider", runtime.ParamLocationPath, chi.URLParam(r, "provider"), &provider)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthProviderToken(w, r, provider)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -268,13 +302,13 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/auth/token", wrapper.GetAuthToken)
-	})
-	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/auth/{provider}/callback", wrapper.GetAuthProviderCallback)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/auth/{provider}/login", wrapper.GetAuthProviderLogin)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/{provider}/token", wrapper.GetAuthProviderToken)
 	})
 
 	return r
@@ -283,15 +317,17 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/7xTQW/bPAz9KwIv38WI3fY7FL4VO2wBBixot9NQBKrM2GptSaWoYFng/z5QjtekWbEd",
-	"hp0MS3zvke9Re7Bu46HeQ4PRkA1svYMablZLtfGkBu10a12rPt0k7hT7J3RRadconbhDx9ZogSygALbc",
-	"o2Cl8g5paw2qm9USCtgixYn4YlEtKhgL8AGdDhZquMpHBQTNXZRWSuEus5b8tsjy8QEpay0bqOE9suh8",
-	"zkWCJT0gI0Wov8pQUMNzQtpBAU4P0lbEKD2sbQMFED4nS9hAzZSwgGg6HLTI8C7kaibrWhjHeymOwbuI",
-	"ubnLqpKP8Y7R5cZ0CP3BhvIx+tzzC18gaZzthNbGYIzrn7O9UisAvwVLGNf2+No6xhZJ7gk3hLF7k2Es",
-	"5hP/8IiGYZSj03BvkRO5qLjD41wXwv9/dXG+DV+cJOLJfsdGTSMsslRMw6BpN3GSxS0q7Y458xJpFQMa",
-	"u7FGHUKY0FPO+0B+axuksTS67x+0efpd6qsD4t1c/+sFkIV6yX+W+Rvpn9pzl7Ilm9T3u+N3gc1rlz5o",
-	"1/Sz6fO0+TlF9oSH9/WGO71vrftTaz7m4n/my1V1ee7LLTaW0PC0aSkiKfZHWzcrqzyZCrrF87WaKGbg",
-	"DPkvHjhOoYJF2s7TJuqhho451GXZe6P7zkeur6vrCsb78UcAAAD//4otg/L9BAAA",
+	"H4sIAAAAAAAC/7yVz2/bOgzH/xWBl3fxS9Ifh8K3vj5sCzBgRdqehqJQbSZW60gqSQfLCv/vA2U7zeIW",
+	"6DBspxYyv+SX/FDKMzi/DJA/Q4lckIvigocczi/nZhnIrK23K+dX5st5I5WR8IiejfWlsY1U6MUVViUT",
+	"yECc1KhajbxC2rgCzfnlHDLYIHGX+Ggym8ygzSBE9DY6yOEkHWUQrVSsVqaae/ocKWxcidROC1vX97Z4",
+	"1I8rFP0TIlKqPC8hh48oWvWyV1wM8ZqU7BoFiSH/qt1CngpBBt6u1e5QBjIgfGocYQm5UIMZcFHh2mo5",
+	"2UaNZSHnV9C22eHAris0LFbQ7CqaInixzuv4CEtHWIi5Wcy78Xlx/15cLT50M9X5JW9PDdL2xVxK+UvO",
+	"bjWYY/CMaZjHs9kY71VTFMi8bOp6u08Sy4k2B9ys15a2kMMn68sae/wDh9QBSyDsN6JTjbjVYaVNvQ/a",
+	"5xT8d4kpDQkvdKRC0zCSHtqlMhyv+WuYhgR3DbnfonUyOx7TWvTZ+Sd/+n+HZZiHSfM20a7wEONi12En",
+	"HCT/cJ/jUDpimUC/l+V1Cv5jLN/Ycb1v6JM7G2PdM5s+cEjGX/JFUvfiOrVNd+Fu1+BBtQzwW3SEfOf2",
+	"PzsvuELS74RLQq7ezNBmw0m4f8BCoNWjQ8bSkOc9qv270GZw+toV/s+WRieGLJlZO2Z9ZhhZ31kz/78X",
+	"Ho2FN17RBnLfsTRd733w6Tg4gTQ+iFmGxpfjtRJyuEFj/b7r9NNhDUcs3NIVu22bdJ0z0mZYiYZqyKES",
+	"ifl0WofC1lVgyc9mZzNob9sfAQAA//9TpKWPoAYAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
