@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -32,7 +33,17 @@ func (s *Server) GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, pr
 	}
 
 	// Generate the state parameter including the redirect URI
-	state := uuid.New().String() + "|" + redirectURI
+	stateToken := uuid.New().String() // Generate a unique CSRF token
+	state := stateToken + "|" + redirectURI
+
+	// Store the state token in Redis with a TTL
+	err := services.StoreStateToken(stateToken) // New helper function for storing state
+	if err != nil {
+		http.Error(w, "Server error while storing state", http.StatusInternalServerError)
+		return
+	}
+
+	// Generate the authorization URL
 	authURL := oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
 
 	// Redirect to the OAuth provider
@@ -46,22 +57,38 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	// Extract the state parameter from params
-	state := params.State
-	parts := strings.SplitN(state, "|", 2)
+	// Extract the state parameter and split into token and redirect URI
+	parts := strings.SplitN(params.State, "|", 2)
 	if len(parts) != 2 {
 		http.Error(w, "Invalid state parameter", http.StatusBadRequest)
 		return
 	}
+
+	stateToken := parts[0]
 	redirectURI := parts[1]
 
+	// Validate the state token
+	isValid := services.ValidateStateToken(stateToken) // New helper function
+	if !isValid {
+		http.Error(w, "Invalid or expired state token", http.StatusBadRequest)
+		return
+	}
+
+	// Delete the state token to prevent reuse
+	go func(stateToken string) {
+		err := services.DeleteStateToken(stateToken) // New helper function
+		if err != nil {
+			log.Printf("Failed to delete state token: %v", err)
+		}
+	}(stateToken)
+
+	// Exchange the authorization code for a token
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		http.Error(w, "Authorization code not provided", http.StatusBadRequest)
 		return
 	}
 
-	// Exchange the code for a token
 	token, err := oauthConfig.Exchange(r.Context(), code)
 	if err != nil {
 		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
@@ -70,20 +97,23 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 
 	// Generate a session ID and store the token
 	sessionID := uuid.New().String()
-	services.StoreToken(sessionID, provider, token)
+	err = services.StoreAuthToken(sessionID, provider, token)
+	if err != nil {
+		http.Error(w, "Failed to store token", http.StatusInternalServerError)
+		return
+	}
 
-	// Redirect to the original URI
 	// Set the session ID as a cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_id",
 		Value:    sessionID,
-		Path:     "/",   // Cookie applies to all routes
-		HttpOnly: true,  // Prevent JavaScript access
+		Path:     "/",
+		HttpOnly: true,
 		Secure:   false, // Set to true in production with HTTPS
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	// Redirect to the front-end without session ID in the URL
+	// Redirect to the original URI
 	http.Redirect(w, r, redirectURI, http.StatusTemporaryRedirect)
 }
 
@@ -101,7 +131,7 @@ func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, pr
 	}
 
 	// Retrieve the token
-	token, found := services.GetToken(sessionCookie.Value, provider)
+	token, found := services.GetAuthToken(sessionCookie.Value, provider)
 	if !found {
 		http.Error(w, "Token not found", http.StatusNotFound)
 		return
@@ -118,7 +148,7 @@ func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, pr
 		}
 
 		// Update the token in storage
-		err = services.StoreToken(sessionCookie.Value, provider, newToken)
+		err = services.StoreAuthToken(sessionCookie.Value, provider, newToken)
 		if err != nil {
 			http.Error(w, "Failed to store refreshed token", http.StatusInternalServerError)
 			return

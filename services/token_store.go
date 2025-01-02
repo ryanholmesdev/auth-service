@@ -9,9 +9,13 @@ import (
 	"time"
 )
 
-func StoreToken(sessionID string, provider string, token *oauth2.Token) error {
-	// Construct the Redis key
-	key := "session:" + sessionID + "_" + provider
+func constructRedisKey(sessionID, provider string) string {
+	return "session:" + sessionID + "_" + provider
+}
+
+func StoreAuthToken(sessionID string, provider string, token *oauth2.Token) error {
+	// Construct the Redis key using the helper function
+	key := constructRedisKey(sessionID, provider)
 
 	// Serialize the token into JSON
 	tokenData, err := json.Marshal(token)
@@ -20,8 +24,8 @@ func StoreToken(sessionID string, provider string, token *oauth2.Token) error {
 		return err
 	}
 
-	// Store the token in Redis
-	err = redisclient.Client.Set(context.Background(), key, tokenData, time.Hour*24).Err() // TTL of 24 hours
+	// Store the token in Redis, with a TTL of 24 hours
+	err = redisclient.Client.Set(context.Background(), key, tokenData, time.Hour*24).Err()
 	if err != nil {
 		log.Printf("Failed to store token in Redis: %v", err)
 		return err
@@ -31,9 +35,9 @@ func StoreToken(sessionID string, provider string, token *oauth2.Token) error {
 	return nil
 }
 
-func GetToken(sessionID string, provider string) (*oauth2.Token, bool) {
-	// Construct the Redis key
-	key := "session:" + sessionID + "_" + provider
+func GetAuthToken(sessionID string, provider string) (*oauth2.Token, bool) {
+	// Construct the Redis key using the helper function
+	key := constructRedisKey(sessionID, provider)
 
 	// Retrieve the token from Redis
 	tokenData, err := redisclient.Client.Get(context.Background(), key).Result()
