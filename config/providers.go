@@ -1,16 +1,15 @@
 package config
 
 import (
-	"fmt"
 	"golang.org/x/oauth2"
 	"log"
 	"os"
+	"strings"
 )
 
 var Providers map[string]*oauth2.Config
 
 func InitConfig() {
-	// Initialize the Providers map
 	Providers = map[string]*oauth2.Config{
 		"spotify": {
 			ClientID:     getEnv("SPOTIFY_CLIENT_ID", ""),
@@ -37,14 +36,13 @@ func getEnv(key, fallback string) string {
 func validateProviders() {
 	for name, config := range Providers {
 		if config.ClientID == "" {
-			log.Fatalf("Missing environment variable for %s: SPOTIFY_CLIENT_ID", name)
+			log.Fatalf("Missing environment variable for: %s_CLIENT_ID", strings.ToUpper(name))
 		}
 		if config.ClientSecret == "" {
-			log.Fatalf("Missing environment variable for %s: SPOTIFY_CLIENT_SECRET", name)
+			log.Fatalf("Missing environment variable for: %s_CLIENT_SECRET", strings.ToUpper(name))
 		}
 		if config.RedirectURL == "" {
-			log.Fatalf("Missing environment variable for %s: SPOTIFY_REDIRECT_URL", name)
+			log.Fatalf("Missing environment variable for: %s_REDIRECT_URL", strings.ToUpper(name))
 		}
 	}
-	fmt.Println("All providers are configured correctly.")
 }

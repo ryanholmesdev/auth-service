@@ -47,14 +47,28 @@ func main() {
 
 	// Enable CORS
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173"}, // Allow your front-end origin
+		AllowedOrigins:   []string{"http://localhost:5173"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		ExposedHeaders:   []string{"Content-Length"},
-		AllowCredentials: true, // Allow cookies and credentials
-		MaxAge:           300,  // Cache preflight request for 5 minutes
+		AllowCredentials: true,
+		MaxAge:           300,
 	}))
 
+	// Setup Swagger
+	setupSwagger(r)
+
+	// Create an instance of server that implements the ServerInterface
+	server := &handlers.Server{}
+
+	// Use the HandlerFromMux function to register routes
+	r.Mount("/", generated.HandlerFromMux(server, r))
+
+	log.Println("Swagger UI available at http://localhost:8080/swagger/")
+	log.Fatal(http.ListenAndServe(":8080", r))
+}
+
+func setupSwagger(r *chi.Mux) {
 	// Serve the OpenAPI document
 	r.Get("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
 		swagger, err := generated.GetSwagger()
@@ -76,16 +90,12 @@ func main() {
 	})
 
 	// Serve the Swagger UI
-	r.Get("/swagger/*", httpSwagger.Handler(
-		httpSwagger.URL("http://localhost:8080/swagger/doc.json"),
-	))
+	r.Get("/swagger/*", func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		swaggerURL := "http://" + host + "/swagger/doc.json"
 
-	// Create an instance of your server that implements the ServerInterface
-	server := &handlers.Server{}
-
-	// Use the HandlerFromMux function to register routes
-	r.Mount("/", generated.HandlerFromMux(server, r))
-
-	log.Println("Swagger UI available at http://localhost:8080/swagger/")
-	log.Fatal(http.ListenAndServe(":8080", r))
+		httpSwagger.Handler(
+			httpSwagger.URL(swaggerURL),
+		)(w, r)
+	})
 }

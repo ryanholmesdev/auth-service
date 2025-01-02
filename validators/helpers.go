@@ -1,14 +1,9 @@
-package helpers
+package validators
 
 import (
-	"fmt"
 	"net/url"
 	"strings"
 )
-
-func ConstructSessionKey(sessionID string) string {
-	return fmt.Sprintf("session:%s", sessionID)
-}
 
 // ValidateRedirectURI checks if the URI is valid and belongs to an allowed domain.
 func ValidateRedirectURI(uri string, allowedDomains []string) bool {
