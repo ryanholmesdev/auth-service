@@ -1,17 +1,23 @@
+version: '3.9'
+
 services:
+  auth-service-redis:
+    image: redis:latest
+    container_name: auth-service-redis
+    ports:
+      - "6379:6379"
+
   auth-service:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: auth-service
     ports:
       - "8080:8080"
-    environment:
-      - APP_ENV=ci
-    volumes:
-      - ./env.ci:/app/.env.ci
+    env_file:
+      - ${ENV_FILE:-.env.local} # Dynamically select the environment file
     depends_on:
-      - redis
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
+      - auth-service-redis
+    environment:
+      - APP_ENV=${APP_ENV:-local} # Default to 'local' if APP_ENV is not set
+      - REDIS_ADDR=auth-service-redis:6379
