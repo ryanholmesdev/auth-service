@@ -21,7 +21,7 @@ jobs:
 
       # Step 3: Set APP_ENV to dev for now
       - name: Set APP_ENV to dev
-        run: echo "APP_ENV=dev" >> $GITHUB_ENV
+        run: echo "APP_ENV=dev"
 
       # Step 4: Verify the service is running
       - name: Health Check
