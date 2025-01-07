@@ -19,7 +19,11 @@ jobs:
           docker-compose down || true # Stop any existing containers
           docker-compose up --build -d # Build and start containers in detached mode
 
-      # Step 3: Verify the service is running
+      # Step 3: Set APP_ENV to dev for now
+      - name: Set APP_ENV to dev
+        run: echo "APP_ENV=dev" >> $GITHUB_ENV
+
+      # Step 4: Verify the service is running
       - name: Health Check
         run: |
           curl --fail http://localhost:8080/swagger/ || exit 1
