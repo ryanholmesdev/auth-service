@@ -18,6 +18,8 @@ import (
 
 func main() {
 
+	log.Println("Loading main application...")
+
 	// Determine the environment
 	appEnv := os.Getenv("APP_ENV")
 	if appEnv == "" {
