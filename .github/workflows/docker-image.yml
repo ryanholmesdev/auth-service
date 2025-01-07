@@ -11,20 +11,24 @@ jobs:
     runs-on: self-hosted # Use your mini PC runner
 
     steps:
-    # Step 1: Checkout the code
-    - uses: actions/checkout@v4
+      # Step 1: Checkout the code
+      - uses: actions/checkout@v4
 
-    # Step 2: Build the Docker image
-    - name: Build Docker Image
-      run: docker build . --file Dockerfile --tag auth-service:latest
+      # Step 2: Build the Docker image
+      - name: Build Docker Image
+        run: docker build . --file Dockerfile --tag auth-service:latest
 
-    # Step 3: Stop existing container (if running)
-    - name: Stop existing container
-      run: |
-        docker stop auth-service || true
-        docker rm auth-service || true
+      # Step 2: Set APP_ENV to dev for now
+      - name: Set APP_ENV to dev
+        run: echo "APP_ENV=dev" >> $GITHUB_ENV
 
-    # Step 4: Run the new container
-    - name: Run new container
-      run: |
-        docker run -d --name auth-service -p 8080:8080 --env-file /home/ryan/actions-runner/.env auth-service:latest
+      # Step 4: Stop existing container (if running)
+      - name: Stop existing container
+        run: |
+          docker stop auth-service || true
+          docker rm auth-service || true
+
+      # Step 5: Run the new container
+      - name: Run new container
+        run: |
+          docker run -d --name auth-service -p 8080:8080 --env-file /home/ryan/actions-runner/.env auth-service:latest
