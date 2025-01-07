@@ -74,7 +74,7 @@ Below is the list of required environment variables:
 #### **Environment File Structure**
 You can create the following `.env` files for different environments:
 
-1. **`.env.local`**
+1. **`.env.local`** - Used for running the application locally on your machine.
     ```dotenv
     SPOTIFY_CLIENT_ID=local-client-id
     SPOTIFY_CLIENT_SECRET=local-client-secret
@@ -82,7 +82,7 @@ You can create the following `.env` files for different environments:
     REDIS_ADDR=localhost:6379
     ```
 
-2. **`.env.dev`**
+2. **`.env.dev`** - Used for the dev enviroment deployments
     ```dotenv
     SPOTIFY_CLIENT_ID=dev-client-id
     SPOTIFY_CLIENT_SECRET=dev-client-secret
@@ -90,7 +90,9 @@ You can create the following `.env` files for different environments:
     REDIS_ADDR=dev-redis-server:6379
     ```
 
-3. **`.env.prod`**
+3 **`.env.ci`** - Used for the ci intergration tests
+
+4 **`.env.prod`** - Used for the prod enviroment 
     ```dotenv
     SPOTIFY_CLIENT_ID=prod-client-id
     SPOTIFY_CLIENT_SECRET=prod-client-secret
@@ -101,6 +103,12 @@ You can create the following `.env` files for different environments:
 `REDIS_ADDR=localhost:6379`
 
 # Running the Application
+
+Set the desired APP_ENV and start the application:
+
+Windows (PowerShell): `$env:APP_ENV = "local"`
+
+Linux/Mac: export APP_ENV=local"
 
 Start the Application
 
@@ -126,6 +134,19 @@ example:
 ## Testing
 
 `go test`
+
+## Creating Builds
+
+You can dynamically specify the environment with Docker Compose to read from the appropriate .env:
+
+Windows (PowerShell):
+$env:APP_ENV = "dev"
+docker-compose up --build
+
+Linux/Mac:
+export APP_ENV=dev
+docker-compose up --build
+
 
 ## License
 

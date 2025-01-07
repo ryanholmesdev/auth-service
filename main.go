@@ -24,14 +24,19 @@ func main() {
 		appEnv = "local" // Default to "local" if APP_ENV is not set
 	}
 
-	// Load environment variables from the appropriate file
 	envFile := ".env." + appEnv
-	err := godotenv.Load(envFile)
-	if err != nil {
-		log.Fatalf("Error loading %s file: %v", envFile, err)
+	if err := godotenv.Load(envFile); err != nil {
+		log.Printf("No %s file found. Proceeding with environment variables.", envFile)
+	} else {
+		log.Printf("Loaded environment from %s", envFile)
 	}
 
-	log.Printf("Environment: %s (loaded %s)", appEnv, envFile)
+	// todo: will remove
+	spotify := os.Getenv("SPOTIFY_CLIENT_ID")
+	if spotify == "" {
+		log.Println("Warning: SPOTIFY_CLIENT_ID is not set")
+	}
+	log.Println("SPOTIFY_CLIENT_ID is set " + spotify)
 
 	// Get Redis address from environment variable
 	redisAddr := os.Getenv("REDIS_ADDR")
