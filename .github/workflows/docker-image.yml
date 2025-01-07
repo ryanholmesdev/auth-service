@@ -1,9 +1,8 @@
-name: Docker Image CI
+name: Docker Compose CI
 
 on:
   push:
     branches:
-      - develop
       - master
 
 jobs:
@@ -11,20 +10,16 @@ jobs:
     runs-on: self-hosted # Use your mini PC runner
 
     steps:
-    # Step 1: Checkout the code
-    - uses: actions/checkout@v4
+      # Step 1: Checkout the code
+      - uses: actions/checkout@v4
 
-    # Step 2: Build the Docker image
-    - name: Build Docker Image
-      run: docker build . --file Dockerfile --tag auth-service:latest
+      # Step 2: Set up Docker Compose
+      - name: Set up Docker Compose
+        run: |
+          docker-compose down || true # Stop any existing containers
+          docker-compose up --build -d # Build and start containers in detached mode
 
-    # Step 3: Stop existing container (if running)
-    - name: Stop existing container
-      run: |
-        docker stop auth-service || true
-        docker rm auth-service || true
-
-    # Step 4: Run the new container
-    - name: Run new container
-      run: |
-        docker run -d --name auth-service -p 8080:8080 --env-file /home/ryan/actions-runner/.env auth-service:latest
+      # Step 3: Verify the service is running
+      - name: Health Check
+        run: |
+          curl --fail http://localhost:8080/swagger/ || exit 1
