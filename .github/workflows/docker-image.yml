@@ -1,9 +1,8 @@
-name: Docker Image CI
+name: Docker Compose CI
 
 on:
   push:
     branches:
-      - develop
       - master
 
 jobs:
@@ -14,21 +13,17 @@ jobs:
       # Step 1: Checkout the code
       - uses: actions/checkout@v4
 
-      # Step 2: Build the Docker image
-      - name: Build Docker Image
-        run: docker build . --file Dockerfile --tag auth-service:latest
+      # Step 2: Set up Docker Compose
+      - name: Set up Docker Compose
+        run: |
+          docker-compose down || true # Stop any existing containers
+          docker-compose up --build -d # Build and start containers in detached mode
 
-      # Step 2: Set APP_ENV to dev for now
+      # Step 3: Set APP_ENV to dev for now
       - name: Set APP_ENV to dev
-        run: echo "APP_ENV=dev" >> $GITHUB_ENV
+        run: echo "APP_ENV=dev"
 
-      # Step 4: Stop existing container (if running)
-      - name: Stop existing container
+      # Step 4: Verify the service is running
+      - name: Health Check
         run: |
-          docker stop auth-service || true
-          docker rm auth-service || true
-
-      # Step 5: Run the new container
-      - name: Run new container
-        run: |
-          docker run -d --name auth-service -p 8080:8080 --env-file /home/ryan/actions-runner/.env auth-service:latest
+          curl --fail http://localhost:8080/swagger/ || exit 1

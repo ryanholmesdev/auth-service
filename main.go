@@ -18,6 +18,8 @@ import (
 
 func main() {
 
+	log.Println("Loading main application...")
+
 	// Determine the environment
 	appEnv := os.Getenv("APP_ENV")
 	if appEnv == "" {
@@ -70,6 +72,7 @@ func main() {
 	r.Mount("/", generated.HandlerFromMux(server, r))
 
 	log.Println("Swagger UI available at http://localhost:8080/swagger/")
+	log.Println("Finished loading application...")
 	log.Fatal(http.ListenAndServe(":8080", r))
 }
 
