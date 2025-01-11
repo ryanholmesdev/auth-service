@@ -3,6 +3,7 @@ package tests
 import (
 	"auth-service/server"
 	"context"
+	_ "github.com/flashlabs/rootpath" // Set's the directory to the root to load the .envs
 	"github.com/stretchr/testify/assert"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"

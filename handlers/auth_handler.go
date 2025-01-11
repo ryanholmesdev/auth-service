@@ -5,7 +5,6 @@ import (
 	"auth-service/generated"
 	"auth-service/services"
 	"auth-service/utils"
-	"auth-service/validators"
 	"encoding/json"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
@@ -28,14 +27,10 @@ func (s *Server) GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, pr
 
 	// Access the redirect_uri from params
 	redirectURI := params.RedirectUri
-	if redirectURI == "" {
-		http.Error(w, "Redirect URI is required", http.StatusBadRequest)
-		return
-	}
 
 	// Validate the redirect URI
-	allowedDomains := []string{"example.com", "localhost"} // todo update
-	if !validators.ValidateRedirectURI(redirectURI, allowedDomains) {
+	allowedDomains, err := utils.GetAllowedRedirectDomains()
+	if !utils.ValidateRedirectURI(redirectURI, allowedDomains) {
 		http.Error(w, "Invalid redirect URI", http.StatusBadRequest)
 		return
 	}
@@ -45,7 +40,7 @@ func (s *Server) GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, pr
 	state := stateToken + "|" + redirectURI
 
 	// Store the state token in Redis with a TTL
-	err := services.StoreStateToken(stateToken)
+	err = services.StoreStateToken(stateToken)
 	if err != nil {
 		http.Error(w, "Server error while storing state", http.StatusInternalServerError)
 		return
@@ -76,8 +71,8 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 	redirectURI := parts[1]
 
 	// Validate the redirect URI
-	allowedDomains := []string{"example.com", "localhost"} // todo update
-	if !validators.ValidateRedirectURI(redirectURI, allowedDomains) {
+	allowedDomains, err := utils.GetAllowedRedirectDomains()
+	if !utils.ValidateRedirectURI(redirectURI, allowedDomains) {
 		http.Error(w, "Invalid redirect URI", http.StatusBadRequest)
 		return
 	}
