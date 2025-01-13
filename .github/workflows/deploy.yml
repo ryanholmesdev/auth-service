@@ -3,11 +3,15 @@ name: Docker Compose CI
 on:
   push:
     branches:
-      - master
+      - master  # Runs on push to master
+
+  pull_request:
+    branches:
+      - master  # Runs on PRs targeting master
 
 jobs:
 
-  # Step 1: Run Tests
+  # Step 1: Run Tests with Coverage Check
   run-tests:
     runs-on: ubuntu-latest
 
@@ -23,8 +27,27 @@ jobs:
       - name: Install dependencies
         run: go mod tidy
 
-      - name: Run tests
-        run: go test ./... -v
+      - name: Run tests with coverage
+        run: |
+          go test ./... -coverprofile=coverage.out -v
+
+      - name: Check coverage threshold (10%)
+        run: |
+          coverage=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+          echo "Total coverage: $coverage%"
+          min_coverage=10.0
+          if (( $(echo "$coverage < $min_coverage" | bc -l) )); then
+            echo "ERROR: Code coverage $coverage% is below the minimum threshold of $min_coverage%"
+            exit 1
+          else
+            echo "Code coverage $coverage% meets the minimum threshold of $min_coverage%"
+          fi
+
+      - name: Upload coverage report (optional)
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage.out
 
   # Step 2: Build and Deploy (runs only if tests pass)
   build-and-deploy:
