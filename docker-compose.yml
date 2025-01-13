@@ -6,6 +6,8 @@ services:
     container_name: auth-service-redis
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data  # Persistent Redis data
 
   auth-service:
     build:
@@ -23,3 +25,7 @@ services:
       - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
       - SPOTIFY_REDIRECT_URL=${SPOTIFY_REDIRECT_URL}
       - ALLOWED_REDIRECT_DOMAINS=${ALLOWED_REDIRECT_DOMAINS}
+
+#  Named volume for Redis persistence
+volumes:
+  redis_data:
