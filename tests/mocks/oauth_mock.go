@@ -1,15 +1,14 @@
 package mocks
 
 import (
-	"github.com/stretchr/testify/mock"
+	"golang.org/x/oauth2"
 )
 
 // MockOAuthConfig mocks the oauth2.Config
 type MockOAuthConfig struct {
-	mock.Mock
+	oauth2.Config
 }
 
-func (m *MockOAuthConfig) AuthCodeURL(state string, _ ...interface{}) string {
-	args := m.Called(state)
-	return args.String(0)
+func (m *MockOAuthConfig) AuthCodeURL(state string, _ ...oauth2.AuthCodeOption) string {
+	return "http://mock-oauth-provider/authorize?state=" + state
 }
