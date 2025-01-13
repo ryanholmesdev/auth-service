@@ -3,7 +3,11 @@ name: Docker Compose CI
 on:
   push:
     branches:
-      - master
+      - master  # Runs on push to master
+
+  pull_request:
+    branches:
+      - master  # Runs on PRs targeting master
 
 jobs:
 
