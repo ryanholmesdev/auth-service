@@ -43,7 +43,7 @@ func InitializeTestEnvironment(t *testing.T) *TestSetup {
 
 	// Inject Redis address into environment
 	os.Setenv("REDIS_ADDR", redisAddr)
-	os.Setenv("APP_ENV", "tests")
+	os.Setenv("APP_ENV", "test")
 
 	// Start server with httptest
 	testServer := httptest.NewServer(server.InitializeServer())
