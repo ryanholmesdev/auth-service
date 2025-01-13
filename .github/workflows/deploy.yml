@@ -28,6 +28,8 @@ jobs:
         run: go mod tidy
 
       - name: Run tests with coverage
+        env:
+          APP_ENV: test  # Use test environment for running tests
         run: |
           go test ./... -coverprofile=coverage.out -v
 
@@ -61,11 +63,16 @@ jobs:
 
       - name: Set up Docker Compose
         run: |
-          docker-compose down || true  # Stop existing containers
-          docker-compose up --build -d  # Build and start containers
-
-      - name: Set APP_ENV to dev
-        run: echo "APP_ENV=dev"
+          cp .env.prod .env  # Set the environment to production
+          docker-compose build auth-service    # Only rebuild the app
+          docker-compose up -d auth-service    # Restart only the app
+        env:
+          APP_ENV: production
+          REDIS_ADDR: ${{ secrets.REDIS_ADDR }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_REDIRECT_URL: ${{ secrets.SPOTIFY_REDIRECT_URL }}
+          ALLOWED_REDIRECT_DOMAINS: ${{ secrets.ALLOWED_REDIRECT_DOMAINS }}
 
       - name: Health Check
         run: |
