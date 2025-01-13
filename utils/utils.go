@@ -42,6 +42,10 @@ func ValidateRedirectURI(uri string, allowedDomains []string) bool {
 	return false
 }
 
+// Declare a variable that defaults to the actual implementation
+var RefreshAccessTokenFunc = RefreshAccessToken
+
+// Actual function to refresh token
 func RefreshAccessToken(oauthConfig *oauth2.Config, refreshToken string) (*oauth2.Token, error) {
 	token := &oauth2.Token{RefreshToken: refreshToken}
 	newToken, err := oauthConfig.TokenSource(context.Background(), token).Token()

@@ -151,7 +151,7 @@ func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, pr
 	if token.Expiry.Before(time.Now()) {
 		// Refresh the token
 		oauthConfig := config.Providers[provider]
-		newToken, err := utils.RefreshAccessToken(oauthConfig, token.RefreshToken)
+		newToken, err := utils.RefreshAccessTokenFunc(oauthConfig, token.RefreshToken)
 		if err != nil {
 			http.Error(w, "Failed to refresh token: "+err.Error(), http.StatusInternalServerError)
 			return

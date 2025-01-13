@@ -1,4 +1,4 @@
-package handlers
+package auth_handler
 
 import (
 	"auth-service/config"
@@ -26,6 +26,7 @@ func buildRequestURL(baseURL, redirectURI string) (*url.URL, error) {
 }
 
 func Test_WhenProviderIsInvalid_ShouldReturn404(t *testing.T) {
+	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -50,6 +51,7 @@ func Test_WhenProviderIsInvalid_ShouldReturn404(t *testing.T) {
 }
 
 func Test_WhenRedirectURIIsMissing_ShouldReturn400(t *testing.T) {
+	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -71,6 +73,7 @@ func Test_WhenRedirectURIIsMissing_ShouldReturn400(t *testing.T) {
 }
 
 func Test_WhenRedirectURIIsInvalid_ShouldReturn400(t *testing.T) {
+	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -98,6 +101,7 @@ func Test_WhenRedirectURIIsInvalid_ShouldReturn400(t *testing.T) {
 }
 
 func Test_WhenOAuthLoginIsTriggered_ShouldRedirectToProvider(t *testing.T) {
+	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -105,8 +109,10 @@ func Test_WhenOAuthLoginIsTriggered_ShouldRedirectToProvider(t *testing.T) {
 	mockTokenURL := setup.Server.URL + "/mock-oauth/token"
 	mockRedirectURI := setup.Server.URL + "/mock-callback"
 
-	os.Setenv("ALLOWED_REDIRECT_DOMAINS", "localhost,127.0.0.1")
-	defer os.Unsetenv("ALLOWED_REDIRECT_DOMAINS")
+	_ = os.Setenv("ALLOWED_REDIRECT_DOMAINS", "localhost,127.0.0.1")
+	defer func() {
+		_ = os.Unsetenv("ALLOWED_REDIRECT_DOMAINS")
+	}()
 
 	// Arrange
 	originalConfig := config.Providers["spotify"]
