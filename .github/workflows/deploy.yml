@@ -62,7 +62,6 @@ jobs:
 
       - name: Set up Docker Compose
         run: |
-          cp .env.prod .env  # Set the environment to production
           docker-compose build auth-service    # Only rebuild the app
           docker-compose up -d auth-service    # Restart only the app
         env:
