@@ -62,8 +62,8 @@ jobs:
 
       - name: Set up Docker Compose
         run: |
-          docker-compose build auth-service    # Only rebuild the app
-          docker-compose up -d auth-service    # Restart only the app
+          docker compose build auth-service    # Only rebuild the app
+          docker compose up -d auth-service    # Restart only the app
         env:
           APP_ENV: production
           REDIS_ADDR: ${{ secrets.REDIS_ADDR }}
