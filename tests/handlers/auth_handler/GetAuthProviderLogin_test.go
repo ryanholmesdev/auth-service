@@ -26,7 +26,6 @@ func buildRequestURL(baseURL, redirectURI string) (*url.URL, error) {
 }
 
 func Test_WhenProviderIsInvalid_ShouldReturn404(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -51,7 +50,6 @@ func Test_WhenProviderIsInvalid_ShouldReturn404(t *testing.T) {
 }
 
 func Test_WhenRedirectURIIsMissing_ShouldReturn400(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -73,7 +71,6 @@ func Test_WhenRedirectURIIsMissing_ShouldReturn400(t *testing.T) {
 }
 
 func Test_WhenRedirectURIIsInvalid_ShouldReturn400(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -101,7 +98,6 @@ func Test_WhenRedirectURIIsInvalid_ShouldReturn400(t *testing.T) {
 }
 
 func Test_WhenOAuthLoginIsTriggered_ShouldRedirectToProvider(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 

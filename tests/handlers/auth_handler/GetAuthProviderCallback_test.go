@@ -29,7 +29,6 @@ func buildCallbackURL(baseURL, code, state string) (*url.URL, error) {
 
 // Test: Invalid Provider
 func Test_Callback_InvalidProvider_ShouldReturn400(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -52,7 +51,6 @@ func Test_Callback_InvalidProvider_ShouldReturn400(t *testing.T) {
 
 // Test: Invalid State Format
 func Test_Callback_InvalidStateFormat_ShouldReturn400(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -75,7 +73,6 @@ func Test_Callback_InvalidStateFormat_ShouldReturn400(t *testing.T) {
 
 // Test: Invalid Redirect URI
 func Test_Callback_InvalidRedirectURI_ShouldReturn400(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -101,7 +98,6 @@ func Test_Callback_InvalidRedirectURI_ShouldReturn400(t *testing.T) {
 
 // Test: Invalid State Token
 func Test_Callback_InvalidStateToken_ShouldReturn400(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -124,7 +120,6 @@ func Test_Callback_InvalidStateToken_ShouldReturn400(t *testing.T) {
 
 // Test: Missing Authorization Code
 func Test_Callback_MissingAuthorizationCode_ShouldReturn400(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -154,7 +149,6 @@ func Test_Callback_MissingAuthorizationCode_ShouldReturn400(t *testing.T) {
 
 // Test: Successful Callback Flow
 func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 

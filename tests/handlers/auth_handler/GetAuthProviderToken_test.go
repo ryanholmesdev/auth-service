@@ -15,7 +15,6 @@ import (
 )
 
 func Test_GetAuthProviderToken_InvalidProvider_ShouldReturn400(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -35,7 +34,6 @@ func Test_GetAuthProviderToken_InvalidProvider_ShouldReturn400(t *testing.T) {
 }
 
 func Test_GetAuthProviderToken_MissingSessionCookie_ShouldReturn400(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -55,7 +53,6 @@ func Test_GetAuthProviderToken_MissingSessionCookie_ShouldReturn400(t *testing.T
 }
 
 func Test_GetAuthProviderToken_TokenNotFound_ShouldReturn404(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -80,7 +77,6 @@ func Test_GetAuthProviderToken_TokenNotFound_ShouldReturn404(t *testing.T) {
 }
 
 func Test_GetAuthProviderToken_ExpiredToken_FailedRefresh_ShouldReturn500(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -123,7 +119,6 @@ func Test_GetAuthProviderToken_ExpiredToken_FailedRefresh_ShouldReturn500(t *tes
 }
 
 func Test_GetAuthProviderToken_ExpiredToken_SuccessfulRefresh_ShouldReturn200(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -172,7 +167,6 @@ func Test_GetAuthProviderToken_ExpiredToken_SuccessfulRefresh_ShouldReturn200(t 
 }
 
 func Test_GetAuthProviderToken_ValidToken_ShouldReturn200(t *testing.T) {
-	t.Parallel()
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
