@@ -14,7 +14,7 @@ jobs:
   # Step 1: Run Tests with Coverage Check
   run-tests:
     runs-on: ubuntu-latest
-
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
       - name: Checkout the code
         uses: actions/checkout@v4
