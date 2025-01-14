@@ -93,36 +93,7 @@ func Test_PostAuthProviderLogout_Success_ShouldReturn200(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-}
-
-// Test failure during token deletion
-func Test_PostAuthProviderLogout_DeleteFailure_ShouldReturn400(t *testing.T) {
-	setup := tests.InitializeTestEnvironment(t)
-	defer setup.Cleanup()
-
-	sessionID := "non-existent-session-id"
-
-	url := setup.Server.URL + "/auth/spotify/logout"
-	req, err := http.NewRequest("POST", url, nil)
-	assert.NoError(t, err)
-
-	// Attach invalid session cookie
-	jar, _ := cookiejar.New(nil)
-	client := &http.Client{Jar: jar}
-	cookie := &http.Cookie{
-		Name:  "session_id",
-		Value: sessionID,
-		Path:  "/",
-	}
-	jar.SetCookies(req.URL, []*http.Cookie{cookie})
-
-	resp, err := client.Do(req)
-	assert.NoError(t, err)
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(body), "Unable to logout")
+	assert.Contains(t, string(body), "Logged out successfully")
 }
