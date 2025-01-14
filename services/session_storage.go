@@ -7,14 +7,15 @@ import (
 	"time"
 )
 
-// Construct a Redis key for session state
-func constructSessionKey(stateToken string) string {
+func ConstructSessionKey(stateToken string) string {
 	return "state:" + stateToken
 }
 
+var StoreStateToken = storeStateToken
+
 // StoreStateToken stores the CSRF state token in Redis with a TTL
-func StoreStateToken(stateToken string) error {
-	key := constructSessionKey(stateToken)
+func storeStateToken(stateToken string) error {
+	key := ConstructSessionKey(stateToken)
 	err := redisclient.Client.Set(context.Background(), key, "valid", time.Minute*5).Err()
 	if err != nil {
 		log.Printf("Failed to store state token in Redis: %v", err)
@@ -26,7 +27,7 @@ func StoreStateToken(stateToken string) error {
 
 // ValidateStateToken checks if the CSRF state token exists in Redis
 func ValidateStateToken(stateToken string) bool {
-	key := constructSessionKey(stateToken)
+	key := ConstructSessionKey(stateToken)
 	_, err := redisclient.Client.Get(context.Background(), key).Result()
 	if err != nil {
 		log.Printf("State token validation failed: %v", err)
@@ -37,7 +38,7 @@ func ValidateStateToken(stateToken string) bool {
 
 // DeleteStateToken removes the CSRF state token from Redis
 func DeleteStateToken(stateToken string) error {
-	key := constructSessionKey(stateToken)
+	key := ConstructSessionKey(stateToken)
 	err := redisclient.Client.Del(context.Background(), key).Err()
 	if err != nil {
 		log.Printf("Failed to delete state token from Redis: %v", err)
