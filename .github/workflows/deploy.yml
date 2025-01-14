@@ -78,4 +78,5 @@ jobs:
 
       - name: Health Check
         run: |
+          sleep 10  # ⏳ Wait for the service to start
           curl --fail http://localhost:8080/swagger/ || exit 1
