@@ -75,3 +75,22 @@ paths:
           description: Unauthorized access.
         '404':
           description: Token not found.
+  /auth/status:
+    get:
+      summary: Retrieve a list of connected providers that the user is logged in with
+      responses:
+        '200':
+          description: List of connected providers.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: boolean
+                example:
+                  spotify: true
+                  tidal: false
+        '400':
+          description: Bad request, missing session ID.
+        '401':
+          description: Unauthorized access.

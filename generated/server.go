@@ -32,6 +32,9 @@ type GetAuthProviderLoginParams struct {
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Retrieve a list of connected providers that the user is logged in with
+	// (GET /auth/status)
+	GetAuthStatus(w http.ResponseWriter, r *http.Request)
 	// Handle OAuth callback and store tokens.
 	// (GET /auth/{provider}/callback)
 	GetAuthProviderCallback(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderCallbackParams)
@@ -46,6 +49,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// Retrieve a list of connected providers that the user is logged in with
+// (GET /auth/status)
+func (_ Unimplemented) GetAuthStatus(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // Handle OAuth callback and store tokens.
 // (GET /auth/{provider}/callback)
@@ -73,6 +82,21 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetAuthStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetAuthStatus(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAuthStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // GetAuthProviderCallback operation middleware
 func (siw *ServerInterfaceWrapper) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request) {
@@ -302,6 +326,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/status", wrapper.GetAuthStatus)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/auth/{provider}/callback", wrapper.GetAuthProviderCallback)
 	})
 	r.Group(func(r chi.Router) {
@@ -317,17 +344,19 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/7yVz2/bOgzH/xWBl3fxS9Ifh8K3vj5sCzBgRdqehqJQbSZW60gqSQfLCv/vA2U7zeIW",
-	"6DBspxYyv+SX/FDKMzi/DJA/Q4lckIvigocczi/nZhnIrK23K+dX5st5I5WR8IiejfWlsY1U6MUVViUT",
-	"yECc1KhajbxC2rgCzfnlHDLYIHGX+Ggym8ygzSBE9DY6yOEkHWUQrVSsVqaae/ocKWxcidROC1vX97Z4",
-	"1I8rFP0TIlKqPC8hh48oWvWyV1wM8ZqU7BoFiSH/qt1CngpBBt6u1e5QBjIgfGocYQm5UIMZcFHh2mo5",
-	"2UaNZSHnV9C22eHAris0LFbQ7CqaInixzuv4CEtHWIi5Wcy78Xlx/15cLT50M9X5JW9PDdL2xVxK+UvO",
-	"bjWYY/CMaZjHs9kY71VTFMi8bOp6u08Sy4k2B9ys15a2kMMn68sae/wDh9QBSyDsN6JTjbjVYaVNvQ/a",
-	"5xT8d4kpDQkvdKRC0zCSHtqlMhyv+WuYhgR3DbnfonUyOx7TWvTZ+Sd/+n+HZZiHSfM20a7wEONi12En",
-	"HCT/cJ/jUDpimUC/l+V1Cv5jLN/Ycb1v6JM7G2PdM5s+cEjGX/JFUvfiOrVNd+Fu1+BBtQzwW3SEfOf2",
-	"PzsvuELS74RLQq7ezNBmw0m4f8BCoNWjQ8bSkOc9qv270GZw+toV/s+WRieGLJlZO2Z9ZhhZ31kz/78X",
-	"Ho2FN17RBnLfsTRd733w6Tg4gTQ+iFmGxpfjtRJyuEFj/b7r9NNhDUcs3NIVu22bdJ0z0mZYiYZqyKES",
-	"ifl0WofC1lVgyc9mZzNob9sfAQAA//9TpKWPoAYAAA==",
+	"H4sIAAAAAAAC/7yVzW7jRgzHX4XgpRfV9n4cFrqlW7Q1sEADZ/dUBMFEoqTZHc9MhpRb19C7FxxJSWwn",
+	"aIpFc1KS4Z9fP5I5oPVNwPKANXGVbBQbPJZ4cbmGJiTYGm9a61v4/aKXDiR8I89gfA2ml4682MqoZIEF",
+	"ihVHqlXLK0o7WxFcXK6xwB0lHh2/WawWKxwKDJG8iRZLfJf/VGA00rGmslTfSxYjff69JdFPiJRysHWN",
+	"Jf5KooGuRqsCE3EMnikr3q5W+qmCF/JZbGJ0U67Lr6ypHJCrjrYmv9a11SfjLpOGETv6kX3Uim5DcGS8",
+	"pk1/mW3UMg/IMYht9lhK6knLr43DsjGOaShmabj9SpXgMAzFSYs/WRYIDVTBe6qEaogp7GxNiRca6f1Y",
+	"w7HoJ1NDorueWArYWmZlw8TaXVj/PAnfnAu/eG1qSPZvqsFUFbFGGQrkfrs1aY8lbkiSpR2BAfd8biCd",
+	"EZCOoGdKYBlcaFuqwXr400qXnY4ED7NoWFbGuVtTffs3nJeT4uNsr2ORzJaEEmP5h84rlnlUsEBvttrj",
+	"OUyegrveJqpnKA+IJx4syfpWkzzt0OeOQGeO4D6i1i/Gem1yotomqgS+bNbjAnixP3682vwyboVuQM7t",
+	"rqe0f0guu/xPmV0/PczH2V71mWHTO7d/vItUn2L9zfja0bTAM4dcAUtINO304mluLrTWvxTap2z8usSU",
+	"hoQHOveDKQFMowzPD9VTmGYHN32y30Xr3ertOa3N5J2P8tOfRyxzPyD3G6Jp6Xw75wpH4Sz5gScfp9Iz",
+	"lhn0S1l+zsb/G8vr7zzY8ehMj/fs5r7Ak2h6taNNxDf28bP1Qi0lfU/UJOLuWQ8vuecbkj55fkR1uguv",
+	"dMvV+P25cQYJPgg0off180ffP846//M3wJEq29jqftoWY+VMaTePRJ8cltiJxHK5dKEyrgss5YfVhxUO",
+	"18M/AQAA///7jc97YggAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
