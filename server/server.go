@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 )
 
-// ✅ InitializeServer returns a fully configured router
 func InitializeServer() http.Handler {
 	// Load environment variables
 	appEnv := os.Getenv("APP_ENV")
@@ -45,7 +44,7 @@ func InitializeServer() http.Handler {
 	// CORS Middleware
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:5173"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -58,10 +57,11 @@ func InitializeServer() http.Handler {
 	server := &handlers.Server{}
 	r.Mount("/", generated.HandlerFromMux(server, r))
 
+	log.Println("Server started successfully")
+
 	return r
 }
 
-// ✅ Swagger setup function
 func setupSwagger(r *chi.Mux) {
 	r.Get("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
 		swagger, err := generated.GetSwagger()
