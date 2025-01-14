@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-// Helper to start isolated Redis for each test
 func setupTestRedis(t *testing.T) (*redis.Client, func()) {
 	client, cleanup := tests.StartRedisTestContainer(t)
 	redisclient.Client = client

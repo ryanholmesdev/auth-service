@@ -14,7 +14,6 @@ func constructRedisKey(sessionID, provider string) string {
 }
 
 func StoreAuthToken(sessionID string, provider string, token *oauth2.Token) error {
-	// Construct the Redis key using the helper function
 	key := constructRedisKey(sessionID, provider)
 
 	// Serialize the token into JSON
@@ -36,7 +35,6 @@ func StoreAuthToken(sessionID string, provider string, token *oauth2.Token) erro
 }
 
 func GetAuthToken(sessionID string, provider string) (*oauth2.Token, bool) {
-	// Construct the Redis key using the helper function
 	key := constructRedisKey(sessionID, provider)
 
 	// Retrieve the token from Redis

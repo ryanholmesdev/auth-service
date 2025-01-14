@@ -19,6 +19,7 @@ type TestSetup struct {
 }
 
 func InitializeTestEnvironment(t *testing.T) *TestSetup {
+	t.Parallel()
 	ctx := context.Background()
 
 	// Start Redis Testcontainer
