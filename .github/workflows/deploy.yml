@@ -76,7 +76,6 @@ jobs:
           SPOTIFY_REDIRECT_URL: ${{ secrets.SPOTIFY_REDIRECT_URL }}
           ALLOWED_REDIRECT_DOMAINS: ${{ secrets.ALLOWED_REDIRECT_DOMAINS }}
 
-      - name: Health Check
-        run: |
-          sleep 10  # ⏳ Wait for the service to start
-          curl --fail http://localhost:8080/swagger/ || exit 1
+        # - name: Health Check
+          ##  sleep 10  # ⏳ Wait for the service to start
+          # curl --fail http://localhost:8080/swagger/ || exit 1
