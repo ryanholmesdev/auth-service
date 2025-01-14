@@ -119,7 +119,7 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false, // todo Set to true in production with HTTPS
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
 

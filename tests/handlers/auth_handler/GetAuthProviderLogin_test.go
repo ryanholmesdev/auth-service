@@ -2,7 +2,9 @@ package auth_handler
 
 import (
 	"auth-service/config"
+	"auth-service/services"
 	"auth-service/tests"
+	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
@@ -13,7 +15,6 @@ import (
 	"testing"
 )
 
-// Helper to build request URLs with query parameters
 func buildRequestURL(baseURL, redirectURI string) (*url.URL, error) {
 	reqURL, err := url.Parse(baseURL)
 	if err != nil {
@@ -75,8 +76,10 @@ func Test_WhenRedirectURIIsInvalid_ShouldReturn400(t *testing.T) {
 	defer setup.Cleanup()
 
 	// Arrange
-	os.Setenv("ALLOWED_REDIRECT_DOMAINS", "localhost,example.com")
-	defer os.Unsetenv("ALLOWED_REDIRECT_DOMAINS")
+	_ = os.Setenv("ALLOWED_REDIRECT_DOMAINS", "localhost,example.com")
+	defer func() {
+		_ = os.Unsetenv("ALLOWED_REDIRECT_DOMAINS")
+	}()
 
 	provider := "spotify"
 	baseURL := setup.Server.URL + "/auth/" + provider + "/login"
@@ -95,6 +98,40 @@ func Test_WhenRedirectURIIsInvalid_ShouldReturn400(t *testing.T) {
 	bodyBytes, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Contains(t, string(bodyBytes), "Invalid redirect URI")
+}
+
+func Test_WhenStateTokenStorageFails_ShouldReturn500(t *testing.T) {
+	setup := tests.InitializeTestEnvironment(t)
+	defer setup.Cleanup()
+
+	// Mock StoreStateToken to simulate a failure
+	originalStoreStateToken := services.StoreStateToken
+	services.StoreStateToken = func(stateToken string) error {
+		return fmt.Errorf("redis internal failed")
+	}
+	defer func() {
+		// Restore original function
+		services.StoreStateToken = originalStoreStateToken
+	}()
+
+	// Arrange
+	provider := "spotify"
+	baseURL := setup.Server.URL + "/auth/" + provider + "/login"
+
+	reqURL, err := buildRequestURL(baseURL, "http://localhost:3000/callback")
+	assert.NoError(t, err)
+
+	// Act
+	resp, err := http.Get(reqURL.String())
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Assert: Should return 500 due to Redis failure
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+	assert.Contains(t, string(bodyBytes), "Server error while storing state")
 }
 
 func Test_WhenOAuthLoginIsTriggered_ShouldRedirectToProvider(t *testing.T) {
@@ -127,7 +164,7 @@ func Test_WhenOAuthLoginIsTriggered_ShouldRedirectToProvider(t *testing.T) {
 
 	router.Get("/mock-callback", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Mock callback received"))
+		_, _ = w.Write([]byte("Mock callback received"))
 	})
 
 	reqURL, err := buildRequestURL(setup.Server.URL+"/auth/spotify/login", mockRedirectURI)
