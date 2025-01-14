@@ -57,3 +57,16 @@ func GetAuthToken(sessionID string, provider string) (*oauth2.Token, bool) {
 	log.Printf("Token retrieved from Redis for session %s, provider %s", sessionID, provider)
 	return &token, true
 }
+
+func DeleteAuthToken(sessionID string, provider string) error {
+	key := constructRedisKey(sessionID, provider)
+
+	err := redisclient.Client.Del(context.Background(), key).Err()
+	if err != nil {
+		log.Printf("Failed to delete token from Redis: %v", err)
+		return err
+	}
+
+	log.Printf("Token deleted from Redis for session %s, provider %s", sessionID, provider)
+	return nil
+}

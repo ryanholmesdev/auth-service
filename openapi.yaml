@@ -75,6 +75,32 @@ paths:
           description: Unauthorized access.
         '404':
           description: Token not found.
+
+  /auth/{provider}/logout:
+    post:
+      summary: Log out the user and invalidate the session.
+      description: Clears the user's session and removes the OAuth token from Redis.
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully logged out.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Successfully logged out.
+        '400':
+          description: Bad request, missing session ID.
+        '401':
+          description: Unauthorized, session not found.
   /auth/status:
     get:
       summary: Retrieve a list of connected providers that the user is logged in with

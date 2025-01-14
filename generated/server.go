@@ -41,6 +41,9 @@ type ServerInterface interface {
 	// Redirect to the provider's OAuth login page.
 	// (GET /auth/{provider}/login)
 	GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderLoginParams)
+	// Log out the user and invalidate the session.
+	// (POST /auth/{provider}/logout)
+	PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string)
 	// Retrieve an OAuth token for a specific provider.
 	// (GET /auth/{provider}/token)
 	GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string)
@@ -65,6 +68,12 @@ func (_ Unimplemented) GetAuthProviderCallback(w http.ResponseWriter, r *http.Re
 // Redirect to the provider's OAuth login page.
 // (GET /auth/{provider}/login)
 func (_ Unimplemented) GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderLoginParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Log out the user and invalidate the session.
+// (POST /auth/{provider}/logout)
+func (_ Unimplemented) PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -177,6 +186,32 @@ func (siw *ServerInterfaceWrapper) GetAuthProviderLogin(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAuthProviderLogin(w, r, provider, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// PostAuthProviderLogout operation middleware
+func (siw *ServerInterfaceWrapper) PostAuthProviderLogout(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "provider" -------------
+	var provider string
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "provider", runtime.ParamLocationPath, chi.URLParam(r, "provider"), &provider)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PostAuthProviderLogout(w, r, provider)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -335,6 +370,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/auth/{provider}/login", wrapper.GetAuthProviderLogin)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/{provider}/logout", wrapper.PostAuthProviderLogout)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/auth/{provider}/token", wrapper.GetAuthProviderToken)
 	})
 
@@ -344,19 +382,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/7yVzW7jRgzHX4XgpRfV9n4cFrqlW7Q1sEADZ/dUBMFEoqTZHc9MhpRb19C7FxxJSWwn",
-	"aIpFc1KS4Z9fP5I5oPVNwPKANXGVbBQbPJZ4cbmGJiTYGm9a61v4/aKXDiR8I89gfA2ml4682MqoZIEF",
-	"ihVHqlXLK0o7WxFcXK6xwB0lHh2/WawWKxwKDJG8iRZLfJf/VGA00rGmslTfSxYjff69JdFPiJRysHWN",
-	"Jf5KooGuRqsCE3EMnikr3q5W+qmCF/JZbGJ0U67Lr6ypHJCrjrYmv9a11SfjLpOGETv6kX3Uim5DcGS8",
-	"pk1/mW3UMg/IMYht9lhK6knLr43DsjGOaShmabj9SpXgMAzFSYs/WRYIDVTBe6qEaogp7GxNiRca6f1Y",
-	"w7HoJ1NDorueWArYWmZlw8TaXVj/PAnfnAu/eG1qSPZvqsFUFbFGGQrkfrs1aY8lbkiSpR2BAfd8biCd",
-	"EZCOoGdKYBlcaFuqwXr400qXnY4ED7NoWFbGuVtTffs3nJeT4uNsr2ORzJaEEmP5h84rlnlUsEBvttrj",
-	"OUyegrveJqpnKA+IJx4syfpWkzzt0OeOQGeO4D6i1i/Gem1yotomqgS+bNbjAnixP3682vwyboVuQM7t",
-	"rqe0f0guu/xPmV0/PczH2V71mWHTO7d/vItUn2L9zfja0bTAM4dcAUtINO304mluLrTWvxTap2z8usSU",
-	"hoQHOveDKQFMowzPD9VTmGYHN32y30Xr3ertOa3N5J2P8tOfRyxzPyD3G6Jp6Xw75wpH4Sz5gScfp9Iz",
-	"lhn0S1l+zsb/G8vr7zzY8ehMj/fs5r7Ak2h6taNNxDf28bP1Qi0lfU/UJOLuWQ8vuecbkj55fkR1uguv",
-	"dMvV+P25cQYJPgg0off180ffP846//M3wJEq29jqftoWY+VMaTePRJ8cltiJxHK5dKEyrgss5YfVhxUO",
-	"18M/AQAA///7jc97YggAAA==",
+	"H4sIAAAAAAAC/9RWTW/jNhD9KwQve1Ft78dhoVuaoq2BADWc3VMRBIw0krhLkczMyK1r6L8XQ0l2bMfY",
+	"FIsN0JNscT7ezHsz1E5bXwWd73QJVKCNbIPXub5aLVUVULXGm9r6Wv1x1XGjOHwFT8r4UpmOG/BsCyMu",
+	"M51ptuxAfMXyFnBjC1BXq6XO9AaQhsBvZ4vZQveZDhG8iVbn+n16lelouCGBMpfYc2LDXfpfA8sjRMCU",
+	"bFnqXP8GLIluB6tMI1AMniB5vFss5FEEz+CTs4nRjVjnX0ig7DQVDbQmnZallSPjVihp2A5xeBuloocQ",
+	"HBgvsOFv00Ypc6cpBrbVVueMHUj5pXE6r4wj6LPJNTx8gYJ13/fZSYtvLLEKlSqC91AwlCpi2NgSkGaS",
+	"6cNQw7HTz6ZUCI8dEGeqtUTCDQFJd9Xyl9Hx7bnjZy9NDWj/gVKZogCSLH2mqWtbg1ud6zUwWtiAMspd",
+	"xqa4May4AdURoLKkXKhrKJX16i/LTQo6MLibnPp5YZx7MMXXb9G5Gj2uJ3uRBZoWGJB0/qfoVedJKjrT",
+	"3rTS4ylNUsFjZxHKiZQDxSMfxGh9LSBPO/SpASWaA7XPKPWzsV6ajFBahILV5/VyGADP9qfr2/Wvw1TI",
+	"BCRsjx3g9gAuhfxPyO6eF/Mx2tsucVh1zm2fziKUp7T+bnzpYBzgiYdUAXFAGGd69jxvLtTWv5S0m2T8",
+	"uowJGxwO7OyFyUGZSjg8X1TP0TQFuO/Qfhdb7xfvztlaj9HpCJ/8HmiZ+qFSv1U0NZxP51Th4Di5vKEx",
+	"xqnrc1yGLrEYA/E5yGsHBg8I39B+sYhYENqwAXoCOglHVRhaJeBIWnusj1WgU4EIgh+mkLvvvAbi0fJv",
+	"gcjUadXvt/7x3I2bL3Sc7r9TvX77DrgY7Yfu/2zv4QOrKnT+bGnchFqAHOQqErB+Y5wtZUXK+zHIBbUl",
+	"dbx0c3xKxv8TXQy35/2+wJNs8o0QLQLd26fH1jPUgHKOUCFQczHCS5SzBu7Qn43jq305iPGHc+NE5GVZ",
+	"HT4x/PESCaiMogiFrWyx322zoXIC3EyS6NDpXDfMMZ/PXSiMawJx/nHxcaH7u/7fAAAA///YPFYx0AoA",
+	"AA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

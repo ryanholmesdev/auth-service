@@ -204,3 +204,29 @@ func (s *Server) GetAuthStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(connectedProviders)
 }
+
+func (s *Server) PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string) {
+	_, exists := config.Providers[provider]
+	if !exists {
+		http.Error(w, "Unsupported provider", http.StatusBadRequest)
+		return
+	}
+
+	sessionCookie, err := r.Cookie("session_id")
+	if err != nil || sessionCookie.Value == "" {
+		http.Error(w, "Session ID is required", http.StatusBadRequest)
+		return
+	}
+
+	err = services.DeleteAuthToken(sessionCookie.Value, provider)
+	if err != nil {
+		http.Error(w, "Unable to logout", http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Logged out successfully",
+	})
+}
