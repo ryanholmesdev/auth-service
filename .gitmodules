@@ -1,0 +1,3 @@
+[submodule "auth-service-client"]
+	path = auth-service-client
+	url = git@github.com:ryanholmesdev/auth-service-client.git
