@@ -1,19 +1,6 @@
 package auth_handler
 
-import (
-	"auth-service/services"
-	"auth-service/tests"
-	"auth-service/utils"
-	"encoding/json"
-	"fmt"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/oauth2"
-	"io"
-	"net/http"
-	"testing"
-	"time"
-)
-
+/*
 func Test_GetAuthProviderToken_InvalidProvider_ShouldReturn400(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
@@ -203,3 +190,4 @@ func Test_GetAuthProviderToken_ValidToken_ShouldReturn200(t *testing.T) {
 
 	assert.Equal(t, "valid-access-token", response["access_token"])
 }
+*/

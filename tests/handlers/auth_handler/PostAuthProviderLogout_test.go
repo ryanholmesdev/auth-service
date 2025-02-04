@@ -71,7 +71,7 @@ func Test_PostAuthProviderLogout_Success_ShouldReturn200(t *testing.T) {
 	provider := "spotify"
 
 	// Store a mock token in Redis
-	err := services.StoreAuthToken(sessionID, provider, createMockOAuthToken())
+	err := services.StoreAuthToken(sessionID, provider, "todo", createMockOAuthToken())
 	assert.NoError(t, err)
 
 	url := setup.Server.URL + "/auth/spotify/logout"

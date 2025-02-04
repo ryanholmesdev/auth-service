@@ -4,6 +4,7 @@ import (
 	"auth-service/config"
 	"auth-service/services"
 	"auth-service/tests"
+	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
@@ -155,6 +156,7 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 	mockAuthURL := setup.Server.URL + "/mock-oauth/authorize"
 	mockTokenURL := setup.Server.URL + "/mock-oauth/token"
 	mockRedirectURI := setup.Server.URL + "/mock-callback"
+	mockUserInfoURL := setup.Server.URL + "/mock-oauth/me"
 
 	os.Setenv("ALLOWED_REDIRECT_DOMAINS", "localhost,127.0.0.1")
 	defer os.Unsetenv("ALLOWED_REDIRECT_DOMAINS")
@@ -169,11 +171,21 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 	}
 	config.Providers["spotify"] = &mockConfig
 
+	// Mock GetProviderUserInfoURL
+	originalGetProviderUserInfoURL := config.GetProviderUserInfoURL
+	config.GetProviderUserInfoURL = func(provider string) (string, error) {
+		if provider == "spotify" {
+			return mockUserInfoURL, nil
+		}
+		return "", fmt.Errorf("provider not supported")
+	}
+	defer func() { config.GetProviderUserInfoURL = originalGetProviderUserInfoURL }()
+
 	// Store a valid state token in Redis
 	err := services.StoreStateToken("mock-state")
 	assert.NoError(t, err)
 
-	// Mock token exchange
+	// Mock token exchange response
 	router := setup.Server.Config.Handler.(*chi.Mux)
 	router.Post("/mock-oauth/token", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -183,6 +195,15 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 			"refresh_token": "mocked-refresh-token",
 			"expires_in": 3600,
 			"token_type": "Bearer"
+		}`))
+	})
+
+	// Mock Spotify `/me` API response to return a user ID
+	router.Get("/mock-oauth/me", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+			"id": "mock-user-id"
 		}`))
 	})
 
@@ -215,8 +236,8 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 	assert.NotEmpty(t, sessionCookie)
 	assert.Equal(t, "session_id", sessionCookie[0].Name)
 
-	// Validate token storage in Redis
-	token, found := services.GetAuthToken(sessionCookie[0].Value, "spotify")
+	// Validate token storage in Redis with user ID
+	token, found := services.GetAuthToken(sessionCookie[0].Value, "spotify", "mock-user-id")
 	assert.True(t, found)
 	assert.Equal(t, "mocked-access-token", token.AccessToken)
 }

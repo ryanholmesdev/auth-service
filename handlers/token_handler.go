@@ -23,7 +23,7 @@ func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, pr
 	}
 
 	// Retrieve the token
-	token, found := services.GetAuthToken(sessionCookie.Value, provider)
+	token, found := services.GetAuthToken(sessionCookie.Value, "todo", provider)
 	if !found {
 		http.Error(w, "Token not found", http.StatusNotFound)
 		return
@@ -40,7 +40,7 @@ func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, pr
 		}
 
 		// Update the token in storage
-		err = services.StoreAuthToken(sessionCookie.Value, provider, newToken)
+		err = services.StoreAuthToken(sessionCookie.Value, provider, "todo", newToken)
 		if err != nil {
 			http.Error(w, "Failed to store refreshed token", http.StatusInternalServerError)
 			return

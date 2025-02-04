@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"golang.org/x/oauth2"
 	"log"
 	"os"
@@ -44,5 +45,16 @@ func validateProviders() {
 		if config.RedirectURL == "" {
 			log.Fatalf("Missing environment variable for: %s_REDIRECT_URL", strings.ToUpper(name))
 		}
+	}
+}
+
+var GetProviderUserInfoURL = func(provider string) (string, error) {
+	switch provider {
+	case "spotify":
+		return "https://api.spotify.com/v1/me", nil
+	case "tidal":
+		return "https://api.tidal.com/v1/me", nil
+	default:
+		return "", fmt.Errorf("provider not supported: %s", provider)
 	}
 }

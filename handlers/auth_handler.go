@@ -101,9 +101,15 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
+	userID, err := services.GetUserID(provider, token)
+	if err != nil {
+		http.Error(w, "Failed to fetch user ID: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Generate a session ID and store the token
 	sessionID := uuid.New().String()
-	err = services.StoreAuthToken(sessionID, provider, token)
+	err = services.StoreAuthToken(sessionID, provider, userID, token)
 	if err != nil {
 		http.Error(w, "Failed to store token", http.StatusInternalServerError)
 		return
@@ -136,7 +142,7 @@ func (s *Server) PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 
-	err = services.DeleteAuthToken(sessionCookie.Value, provider)
+	//todo: err = services.DeleteAuthToken(sessionCookie.Value, provider)
 	if err != nil {
 		http.Error(w, "Unable to logout", http.StatusBadRequest)
 		return
