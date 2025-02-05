@@ -1,0 +1,56 @@
+name: Update Auth Client
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "generated/server.go"
+
+jobs:
+  update-client:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout auth-service repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.23"
+
+      - name: Install oapi-codegen
+        run: |
+          go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
+
+      - name: Generate Auth Client
+        run: |
+          oapi-codegen -generate types,client -package authclient -o ./auth-service-client/client.gen.go ./openapi.yaml
+
+      - name: Commit and Push Changes to auth-service-client
+        run: |
+          cd auth-service-client
+          git config --global user.email "bot@github.com"
+          git config --global user.name "GitHub Bot"
+          git add client.gen.go
+          if git diff --cached --quiet; then
+            echo "No changes detected in auth-service-client, skipping commit."
+          else
+            git commit -m "Auto-update generated client from auth-service"
+            git tag -a v$(date +'%Y.%m.%d-%H%M%S') -m "Automated release"
+            git push origin master --tags
+          fi
+
+      - name: Update auth-service submodule
+        run: |
+          git add auth-service-client
+          if git diff --cached --quiet; then
+            echo "No submodule changes detected, skipping commit."
+          else
+            git commit -m "Update auth-service-client submodule after auto-update"
+            git push origin master
+          fi
