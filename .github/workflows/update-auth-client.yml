@@ -16,6 +16,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: true
+          fetch-depth: 0  # Ensure all tags are fetched
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Set up Go
@@ -31,17 +32,38 @@ jobs:
         run: |
           oapi-codegen -generate types,client -package authclient -o ./auth-service-client/client.gen.go ./openapi.yaml
 
+      - name: Determine Next Version
+        id: versioning
+        run: |
+          cd auth-service-client
+          LATEST_TAG=$(git tag --sort=-v:refname | head -n 1)
+          echo "Latest Tag: $LATEST_TAG"
+
+          if [[ -z "$LATEST_TAG" ]]; then
+            NEW_TAG="v1.0.0"
+          else
+            MAJOR=$(echo $LATEST_TAG | cut -d. -f1 | tr -d 'v')
+            MINOR=$(echo $LATEST_TAG | cut -d. -f2)
+            PATCH=$(echo $LATEST_TAG | cut -d. -f3)
+            PATCH=$((PATCH + 1))  # Increment PATCH version
+            NEW_TAG="v$MAJOR.$MINOR.$PATCH"
+          fi
+
+          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+          echo "Next Tag: $NEW_TAG"
+
       - name: Commit and Push Changes to auth-service-client
         run: |
           cd auth-service-client
           git config --global user.email "bot@github.com"
           git config --global user.name "GitHub Bot"
           git add client.gen.go
+
           if git diff --cached --quiet; then
             echo "No changes detected in auth-service-client, skipping commit."
           else
             git commit -m "Auto-update generated client from auth-service"
-            git tag -a v$(date +'%Y.%m.%d-%H%M%S') -m "Automated release"
+            git tag -a $NEW_TAG -m "Automated release $NEW_TAG"
             git push origin master --tags
           fi
 
@@ -53,4 +75,3 @@ jobs:
           else
             git commit -m "Update auth-service-client submodule after auto-update"
             git push origin master
-          fi
