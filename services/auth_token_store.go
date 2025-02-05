@@ -122,3 +122,25 @@ func DeleteAuthToken(sessionID, provider, userID string) error {
 	log.Printf("Token deleted from Redis for session %s, provider %s, user %s", sessionID, provider, userID)
 	return nil
 }
+
+func DeleteAllAuthTokensForProvider(sessionID, provider string) error {
+	pattern := fmt.Sprintf("session:%s_%s_*", sessionID, provider)
+	keys, err := redisclient.Client.Keys(context.Background(), pattern).Result()
+	if err != nil {
+		log.Printf("Failed to fetch keys for logout: %v", err)
+		return err
+	}
+
+	if len(keys) == 0 {
+		return nil // Nothing to delete
+	}
+
+	err = redisclient.Client.Del(context.Background(), keys...).Err()
+	if err != nil {
+		log.Printf("Failed to delete keys for provider %s: %v", provider, err)
+		return err
+	}
+
+	log.Printf("Successfully deleted all tokens for provider %s", provider)
+	return nil
+}

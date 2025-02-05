@@ -30,6 +30,12 @@ type GetAuthProviderLoginParams struct {
 	RedirectUri string `form:"redirect_uri" json:"redirect_uri"`
 }
 
+// PostAuthProviderLogoutParams defines parameters for PostAuthProviderLogout.
+type PostAuthProviderLogoutParams struct {
+	// UserId The specific user ID to log out. If omitted, logs out all users under this provider.
+	UserId *string `form:"user_id,omitempty" json:"user_id,omitempty"`
+}
+
 // GetAuthProviderTokenParams defines parameters for GetAuthProviderToken.
 type GetAuthProviderTokenParams struct {
 	// UserId The unique identifier of the user for whom the token is being retrieved.
@@ -47,9 +53,9 @@ type ServerInterface interface {
 	// Redirect to the provider's OAuth login page.
 	// (GET /auth/{provider}/login)
 	GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderLoginParams)
-	// Log out the user and invalidate the session.
+	// Log out a user or all users from a provider.
 	// (POST /auth/{provider}/logout)
-	PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string)
+	PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string, params PostAuthProviderLogoutParams)
 	// Retrieve an OAuth token for a specific provider and user.
 	// (GET /auth/{provider}/token)
 	GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderTokenParams)
@@ -77,9 +83,9 @@ func (_ Unimplemented) GetAuthProviderLogin(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Log out the user and invalidate the session.
+// Log out a user or all users from a provider.
 // (POST /auth/{provider}/logout)
-func (_ Unimplemented) PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string) {
+func (_ Unimplemented) PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string, params PostAuthProviderLogoutParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -216,8 +222,19 @@ func (siw *ServerInterfaceWrapper) PostAuthProviderLogout(w http.ResponseWriter,
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostAuthProviderLogoutParams
+
+	// ------------- Optional query parameter "user_id" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "user_id", r.URL.Query(), &params.UserId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PostAuthProviderLogout(w, r, provider)
+		siw.Handler.PostAuthProviderLogout(w, r, provider, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -406,22 +423,22 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/8RW32/bNhD+Vwi+9EWxnaYYCr1lGbYZCDDDaZ+GIGDEk8SGIhXe0Z1n+H8fjpLs2rLR",
-	"dEXTJyfi/fjuvu+O3EjjSi/zjdSARTAtGe9kLq8Xc1H6IBrlVGVcJf66jlQL8k/gUCinhYpUgyNTKHaZ",
-	"yEySIQvsy5Z3EFamAHG9mMtMriBgF/hyMpvM5DaTvgWnWiNzeZU+ZbJVVCNDmXLsKZKimP6vgPjHtxBS",
-	"srmWufwDiBPddVaZDICtdwjJ4+1sxj+FdwQuOau2tT3W6SdkKBuJRQ2NSqdaGz5SdhE4DZkuDq1brujR",
-	"ewvKMWz4RzUtl7mR2Hoy5VrmFCJw+VpZmZfKImyzwdU/foKC5Ha7zY5afGuQhC9F4Z2DgkCLNviV0RBw",
-	"wpnedTUcOv2qtAjwHAEpE41BZG4QkLsr5r/1jpdjx4+Om+qD+Re0UEUByFm2mcTYNCqsZS6XQMHACoQS",
-	"9jw2QbUiQTWIiBCEQWF9VYEWxonPhuoUtGNwMzhtp4Wy9lEVT1+jc9F73Az2LIugGiAIKPO/Wa8yT1KR",
-	"mXSq4R4PaZIKnqMJoAdS9hT3fCAF4yoGedyhDzUI1hyIXUaun5Rx3OQA2gQoSHxczrsBcGQubu6Wv3dT",
-	"wROQsD1HCOs9uBTym5DdnxbzIdq7mDgso7XrL2cR9DGtfyqnLfQDPPCQKkDyAfqZnpzmzfrKuJeSdpuM",
-	"X5cxZoP8np2dMMkLVTKH40V1iqYhwEMM5rvYupq9HbO17KPjAT7+u6Nl6IdI/RatqmA8nUOFnePg8gb7",
-	"GMeup7j0MbHYeqQxyBsLKuwRvsHdYmGxBGj8CvAL0Ek4ogy+EQwOubWH+lh4PBYII/hhCrn/zmugPVj+",
-	"DSCqKq363dY/nLt+8/lI6f471uvX74Cz0X7o/s92Hs6TKH10o6Vx6ysGspcrS8C4lbJG84rk732QM2pL",
-	"6njp5viQjF93c0RnniMIo3k5lAYCX3i7evnx87n2TfrSKd2geITuKuguSn1umXCEB6N/ona7G/5hR8Je",
-	"wI0vni6644t0fHE51i6/c1oTAB/MofvVL7PZzto4ggoCmwcoA2B9NmF/fj7jS6ZlCRSDO7GCfOgE2ULB",
-	"TO5fK0m2zMb/nijhQyeIb39csfG7sXHS+n7yXoj+zEvNjRqhhkDF6TgcCMJqGLEYrMxlTdTm06n1hbK1",
-	"R8rfz97P5PZ++18AAAD//2hj+bEgDAAA",
+	"H4sIAAAAAAAC/7xWTW/bOBP+KwQv70WxnaZ4UeiWbbG7BgJs4LSnRREw4khiQ5EKZ+iu1/B/Xwwl2ZE/",
+	"Nm6KzckyOd/PMzNcS+NKL/O11IBFMC0Z72Qur2/novRBNMqpyrhK/HEdqRbkH8GhUE4LFakGR6ZQrDKR",
+	"mSRDFliXJe8gLE0B4vp2LjO5hICd4cvJbDKTm0z6FpxqjczlVTrKZKuoRg5lyranSIpi+l8B8Y9vISRn",
+	"cy1z+RsQO7rrpDIZAFvvEJLGu9mMfwrvCFxSVm1r+1in35BDWUssamhUutXa8JWyt4HdkOns0KrljB68",
+	"t6Achw1/qablNNcSW0+mXMmcQgROXysr81JZhE02qPqHb1CQ3Gw22V6JbwyS8KUovHNQEGjRBr80GgJO",
+	"2NP7Loex0i9KiwBPEZAy0RhExgYBubpi/qlXvDxU/OK4qD6Yv0ELVRSA7GWTSYxNo8JK5nIBFAwsQShh",
+	"T8cmqFYkqAYREYIwKKyvKtDCOPHdUJ2MdgiuB6XNtFDWPqji8SU4b3uNj4M80yKoBggCyvxP5qvME1Vk",
+	"Jp1quMaDm8SCp2gC6AGUHcQ9HkjBuIqD3K/Q5xoEcw7E1iPnT8o4LnIAbQIUJL4s5l0DODIXH+8Wv3Zd",
+	"wR2QYnuKEFa74JLJH4rs63Eyj6O9iwnDMlq7et6LoPdh/V05baFv4AGHlAGSD9D39OQ4btZXxp0L2k0S",
+	"flvEGA3yO3S2xCQvVMkYHg6qYzANBu5jMD+F1tXs3SFai946juLj7w6WoR4i1Vu0qoLD7hwy7BQHlf9h",
+	"b2Nf9RiWPiYUW490LMjGL4Gn+/Npn9aAEthCYUpTdMHzkbXpG0V0HLnaRsQlHvPk1uM+UTiSN+7tUQbz",
+	"T1xI6yvhI03EvBS+MUSgMz5EPj1IkWqDoyyPEYkV7o2Wr+jws9dVO1pSDSCqKq2k7XYaz4d+QnOmMjus",
+	"1su76qS1/3RPZVsN50mUPrqD4XbTASjUEV6WwTcjWh7tikTycyfc5yT8tryNzjxFEEbzECsNZ1nuxgh3",
+	"5/faN+mka1iD4gG6ldUtdP0yV396O72Su91L5H4Lwo7AjS8eL7rri3R9cXnIXX6PtSYA3pux+tX/Z7Ot",
+	"tHEEFQQWD1AGwPqkw/7+tMdzumUBFIPDZ/N9N0lpN4mevarSOmY0Xt1RTP1+sP3oI5CF3x8KJ67vOu/M",
+	"6E+8KP91pRy1w4YgLIcWi8HKXNZEbT6dWl8oW3uk/MPsw0xuvm7+CQAA//8SIuyryAwAAA==",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

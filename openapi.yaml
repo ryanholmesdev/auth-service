@@ -87,14 +87,20 @@ paths:
 
   /auth/{provider}/logout:
     post:
-      summary: Log out the user and invalidate the session.
-      description: Clears the user's session and removes the OAuth token from Redis.
+      summary: Log out a user or all users from a provider.
+      description: Removes an OAuth token for a specific user or all users under a provider.
       parameters:
         - name: provider
           in: path
           required: true
           schema:
             type: string
+        - name: user_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The specific user ID to log out. If omitted, logs out all users under this provider.
       responses:
         '200':
           description: Successfully logged out.
