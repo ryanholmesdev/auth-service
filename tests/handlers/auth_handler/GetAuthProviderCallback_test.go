@@ -203,10 +203,10 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{
-			"id": "mock-user-id",
-			"display_name": "Mock User",
-			"email": "mockuser@googlemail.com",
-		}`))
+		"id": "mock-user-id",
+		"display_name": "Mock User",
+		"email": "mockuser@googlemail.com"
+	}`))
 	})
 
 	// Build callback URL with valid state and code
