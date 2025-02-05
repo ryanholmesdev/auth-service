@@ -16,7 +16,7 @@ func InitConfig() {
 			ClientID:     getEnv("SPOTIFY_CLIENT_ID", ""),
 			ClientSecret: getEnv("SPOTIFY_CLIENT_SECRET", ""),
 			RedirectURL:  getEnv("SPOTIFY_REDIRECT_URL", ""),
-			Scopes:       []string{"playlist-read-private", "playlist-modify-public"},
+			Scopes:       []string{"playlist-read-private", "playlist-modify-public", "user-read-email", "user-read-private"},
 			Endpoint: oauth2.Endpoint{
 				AuthURL:  "https://accounts.spotify.com/authorize",
 				TokenURL: "https://accounts.spotify.com/api/token",

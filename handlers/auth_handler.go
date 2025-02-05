@@ -102,15 +102,15 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
-	userID, err := services.GetUserID(provider, token)
+	user, err := services.GetUserInfo(provider, token)
 	if err != nil {
-		http.Error(w, "Failed to fetch user ID: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to fetch user information: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Generate a session ID and store the token
 	sessionID := uuid.New().String()
-	err = services.StoreAuthToken(sessionID, provider, userID, token)
+	err = services.StoreAuthToken(sessionID, provider, user, token)
 	if err != nil {
 		http.Error(w, "Failed to store token", http.StatusInternalServerError)
 		return

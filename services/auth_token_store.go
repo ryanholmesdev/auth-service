@@ -16,58 +16,74 @@ func constructRedisKey(sessionID, provider, userID string) string {
 	return fmt.Sprintf("session:%s_%s_%s", sessionID, provider, userID)
 }
 
-// StoreAuthToken stores an OAuth token for a specific user under a provider
-func StoreAuthToken(sessionID, provider, userID string, token *oauth2.Token) error {
-	key := constructRedisKey(sessionID, provider, userID)
+// AuthData represents stored auth info in Redis
+type AuthData struct {
+	Token       *oauth2.Token `json:"token"`
+	UserID      string        `json:"user_id"`
+	DisplayName string        `json:"display_name"`
+	Email       string        `json:"email"`
+}
 
-	// Serialize token into JSON
-	tokenData, err := json.Marshal(token)
+// StoreAuthToken stores OAuth token and user info in Redis
+func StoreAuthToken(sessionID, provider string, userInfo *UserInfo, token *oauth2.Token) error {
+	key := constructRedisKey(sessionID, provider, userInfo.ID)
+
+	authData := AuthData{
+		Token:       token,
+		UserID:      userInfo.ID,
+		DisplayName: userInfo.DisplayName,
+		Email:       userInfo.Email,
+	}
+
+	// Serialize auth data into JSON
+	authDataJSON, err := json.Marshal(authData)
 	if err != nil {
-		log.Printf("Failed to serialize token: %v", err)
+		log.Printf("Failed to serialize auth data: %v", err)
 		return err
 	}
 
-	// Store token in Redis with expiration based on the token's expiry time
-	err = redisclient.Client.Set(context.Background(), key, tokenData, time.Until(token.Expiry)).Err()
+	// Store in Redis with expiration based on token expiry
+	err = redisclient.Client.Set(context.Background(), key, authDataJSON, time.Until(token.Expiry)).Err()
 	if err != nil {
-		log.Printf("Failed to store token in Redis: %v", err)
+		log.Printf("Failed to store auth data in Redis: %v", err)
 		return err
 	}
 
-	log.Printf("Token stored in Redis for session %s, provider %s, user %s", sessionID, provider, userID)
+	log.Printf("Stored auth data in Redis for session %s, provider %s, user %s", sessionID, provider, userInfo.ID)
 	return nil
 }
 
-// GetAuthToken retrieves an OAuth token for a specific provider and user account
-func GetAuthToken(sessionID, provider, userID string) (*oauth2.Token, bool) {
+// GetAuthToken retrieves OAuth token and user info from Redis
+func GetAuthToken(sessionID, provider, userID string) (*AuthData, bool) {
 	key := constructRedisKey(sessionID, provider, userID)
 
-	// Retrieve token from Redis
-	tokenData, err := redisclient.Client.Get(context.Background(), key).Result()
+	// Retrieve from Redis
+	authDataJSON, err := redisclient.Client.Get(context.Background(), key).Result()
 	if err != nil {
-		log.Printf("Failed to retrieve token from Redis: %v", err)
+		log.Printf("Failed to retrieve auth data from Redis: %v", err)
 		return nil, false
 	}
 
-	// Deserialize token from JSON
-	var token oauth2.Token
-	err = json.Unmarshal([]byte(tokenData), &token)
+	// Deserialize JSON
+	var authData AuthData
+	err = json.Unmarshal([]byte(authDataJSON), &authData)
 	if err != nil {
-		log.Printf("Failed to deserialize token: %v", err)
+		log.Printf("Failed to deserialize auth data: %v", err)
 		return nil, false
 	}
 
-	log.Printf("Token retrieved from Redis for session %s, provider %s, user %s", sessionID, provider, userID)
-	return &token, true
+	return &authData, true
 }
 
 type LoggedInProvider struct {
-	Provider string `json:"provider"`
-	User     string `json:"user"`
-	LoggedIn bool   `json:"logged_in"`
+	Provider    string `json:"provider"`
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	LoggedIn    bool   `json:"logged_in"`
 }
 
-// GetLoggedInProviders returns all logged-in providers and user IDs for a session
+// GetLoggedInProviders returns all logged-in providers with user details
 func GetLoggedInProviders(sessionID string) ([]LoggedInProvider, error) {
 	// Pattern to search for all providers under the session
 	pattern := fmt.Sprintf("session:%s_*", sessionID)
@@ -86,22 +102,23 @@ func GetLoggedInProviders(sessionID string) ([]LoggedInProvider, error) {
 			continue // Skip invalid keys
 		}
 
-		provider := parts[1] // Extracts provider from `session:<session_id>_<provider>_<user_id>`
-		userID := parts[2]   // Extracts user ID
+		provider := parts[1] // Extract provider from `session:<session_id>_<provider>_<user_id>`
 
-		// Fetch stored token (ignoring expiration logic)
-		tokenData, err := redisclient.Client.Get(context.Background(), key).Result()
+		// Fetch stored auth data (including token & user details)
+		authDataJSON, err := redisclient.Client.Get(context.Background(), key).Result()
 		if err != nil {
-			continue // Skip if token retrieval fails
+			continue // Skip if retrieval fails
 		}
 
-		var token oauth2.Token
-		if err := json.Unmarshal([]byte(tokenData), &token); err == nil {
-			// Always mark as logged in (ignoring expiry check)
+		var authData AuthData
+		if err := json.Unmarshal([]byte(authDataJSON), &authData); err == nil {
+			// Append user info to the list
 			loggedInProviders = append(loggedInProviders, LoggedInProvider{
-				Provider: provider,
-				User:     userID,
-				LoggedIn: true,
+				Provider:    provider,
+				UserID:      authData.UserID,
+				DisplayName: authData.DisplayName,
+				Email:       authData.Email,
+				LoggedIn:    true,
 			})
 		}
 	}
