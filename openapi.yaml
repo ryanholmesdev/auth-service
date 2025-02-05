@@ -48,16 +48,22 @@ paths:
 
   /auth/{provider}/token:
     get:
-      summary: Retrieve an OAuth token for a specific provider.
+      summary: Retrieve an OAuth token for a specific provider and user.
       parameters:
         - name: provider
           in: path
           required: true
           schema:
             type: string
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the user for whom the token is being retrieved.
       responses:
         '200':
-          description: Returns the OAuth token.
+          description: Returns the OAuth token for the specified provider and user.
           content:
             application/json:
               schema:
@@ -65,27 +71,36 @@ paths:
                 properties:
                   access_token:
                     type: string
+                    example: "mock-access-token-1"
                   expires_in:
                     type: integer
+                    example: 3600
                   refresh_token:
                     type: string
+                    example: "mock-refresh-token-1"
         '400':
-          description: Bad request, missing session ID.
+          description: Bad request, missing session ID or user ID.
         '401':
           description: Unauthorized access.
         '404':
-          description: Token not found.
+          description: Token not found for the specified provider and user.
 
   /auth/{provider}/logout:
     post:
-      summary: Log out the user and invalidate the session.
-      description: Clears the user's session and removes the OAuth token from Redis.
+      summary: Log out a user or all users from a provider.
+      description: Removes an OAuth token for a specific user or all users under a provider.
       parameters:
         - name: provider
           in: path
           required: true
           schema:
             type: string
+        - name: user_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The specific user ID to log out. If omitted, logs out all users under this provider.
       responses:
         '200':
           description: Successfully logged out.
@@ -104,19 +119,53 @@ paths:
   /auth/status:
     get:
       summary: Retrieve a list of connected providers that the user is logged in with
+      description: Returns a list of providers along with login status and user details.
       responses:
         '200':
           description: List of connected providers.
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties:
-                  type: boolean
-                example:
-                  spotify: true
-                  tidal: false
+                type: array
+                items:
+                  type: object
+                  properties:
+                    provider:
+                      type: string
+                      example: "spotify"
+                    user_id:
+                      type: string
+                      example: "user123"
+                    display_name:
+                      type: string
+                      example: "John Doe"
+                    email:
+                      type: string
+                      example: "john@example.com"
+                    logged_in:
+                      type: boolean
+                      example: true
+              examples:
+                Single Provider Logged In:
+                  value:
+                    - provider: "spotify"
+                      user_id: "user123"
+                      display_name: "John Doe"
+                      email: "john@example.com"
+                      logged_in: true
+                Multiple Providers Logged In:
+                  value:
+                    - provider: "spotify"
+                      user_id: "user123"
+                      display_name: "John Doe"
+                      email: "john@example.com"
+                      logged_in: true
+                    - provider: "tidal"
+                      user_id: "user456"
+                      display_name: "Alice Smith"
+                      email: "alice@example.com"
+                      logged_in: true
         '400':
           description: Bad request, missing session ID.
         '401':
-          description: Unauthorized access.
+          description: Unauthorized access meaning user is not connected to any providers.

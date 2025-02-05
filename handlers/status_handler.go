@@ -1,11 +1,9 @@
 package handlers
 
 import (
-	"auth-service/config"
 	"auth-service/services"
 	"encoding/json"
 	"net/http"
-	"time"
 )
 
 func (s *Server) GetAuthStatus(w http.ResponseWriter, r *http.Request) {
@@ -16,21 +14,12 @@ func (s *Server) GetAuthStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	connectedProviders := make(map[string]bool)
-
-	// Loop through all configured providers
-	for provider := range config.Providers {
-		//
-		//Check if a valid token exists for each provider
-		token, found := services.GetAuthToken(sessionCookie.Value, provider)
-		if found && token.Expiry.After(time.Now()) {
-			connectedProviders[provider] = true
-		} else {
-			connectedProviders[provider] = false
-		}
+	connectedProviders, err := services.GetLoggedInProviders(sessionCookie.Value)
+	if err != nil {
+		http.Error(w, "Unable to get logged in providers", http.StatusInternalServerError)
+		return
 	}
 
-	// Return the connection status as JSON
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(connectedProviders)
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"golang.org/x/oauth2"
 	"log"
 	"os"
@@ -15,7 +16,7 @@ func InitConfig() {
 			ClientID:     getEnv("SPOTIFY_CLIENT_ID", ""),
 			ClientSecret: getEnv("SPOTIFY_CLIENT_SECRET", ""),
 			RedirectURL:  getEnv("SPOTIFY_REDIRECT_URL", ""),
-			Scopes:       []string{"playlist-read-private", "playlist-modify-public"},
+			Scopes:       []string{"playlist-read-private", "playlist-modify-public", "user-read-email", "user-read-private"},
 			Endpoint: oauth2.Endpoint{
 				AuthURL:  "https://accounts.spotify.com/authorize",
 				TokenURL: "https://accounts.spotify.com/api/token",
@@ -44,5 +45,16 @@ func validateProviders() {
 		if config.RedirectURL == "" {
 			log.Fatalf("Missing environment variable for: %s_REDIRECT_URL", strings.ToUpper(name))
 		}
+	}
+}
+
+var GetProviderUserInfoURL = func(provider string) (string, error) {
+	switch provider {
+	case "spotify":
+		return "https://api.spotify.com/v1/me", nil
+	case "tidal":
+		return "https://api.tidal.com/v1/me", nil
+	default:
+		return "", fmt.Errorf("provider not supported: %s", provider)
 	}
 }

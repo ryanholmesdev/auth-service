@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"auth-service/config"
+	"auth-service/generated"
 	"auth-service/services"
 	"auth-service/utils"
 	"encoding/json"
@@ -9,7 +10,7 @@ import (
 	"time"
 )
 
-func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string) {
+func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string, params generated.GetAuthProviderTokenParams) {
 	_, exists := config.Providers[provider]
 	if !exists {
 		http.Error(w, "Unsupported provider", http.StatusBadRequest)
@@ -22,38 +23,48 @@ func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, pr
 		return
 	}
 
+	if params.UserId == "" {
+		http.Error(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+	userID := params.UserId
+
 	// Retrieve the token
-	token, found := services.GetAuthToken(sessionCookie.Value, provider)
+	token, found := services.GetAuthToken(sessionCookie.Value, provider, userID)
 	if !found {
 		http.Error(w, "Token not found", http.StatusNotFound)
 		return
 	}
 
 	// Check if the token is expired
-	if token.Expiry.Before(time.Now()) {
+	if token.Token.Expiry.Before(time.Now()) {
 		// Refresh the token
 		oauthConfig := config.Providers[provider]
-		newToken, err := utils.RefreshAccessTokenFunc(oauthConfig, token.RefreshToken)
+		newToken, err := utils.RefreshAccessTokenFunc(oauthConfig, token.Token.RefreshToken)
 		if err != nil {
 			http.Error(w, "Failed to refresh token: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
 		// Update the token in storage
-		err = services.StoreAuthToken(sessionCookie.Value, provider, newToken)
-		if err != nil {
-			http.Error(w, "Failed to store refreshed token", http.StatusInternalServerError)
-			return
+		// Extract user info from `token`
+		userInfo := &services.UserInfo{
+			ID:          token.UserID,
+			DisplayName: token.DisplayName,
+			Email:       token.Email,
 		}
 
-		token = newToken
+		// Update the token in storage
+		err = services.StoreAuthToken(sessionCookie.Value, provider, userInfo, newToken)
+
+		token.Token = newToken
 	}
 
 	// Return the token
 	response := map[string]interface{}{
-		"access_token":  token.AccessToken,
-		"refresh_token": token.RefreshToken,
-		"expires_in":    token.Expiry.Unix(),
+		"access_token":  token.Token.AccessToken,
+		"refresh_token": token.Token.RefreshToken,
+		"expires_in":    token.Token.Expiry.Unix(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

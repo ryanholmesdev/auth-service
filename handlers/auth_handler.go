@@ -6,6 +6,7 @@ import (
 	"auth-service/services"
 	"auth-service/utils"
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 	"log"
@@ -101,9 +102,16 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
+	// Fetch the user information from the provider
+	user, err := services.GetUserInfo(provider, token)
+	if err != nil {
+		http.Error(w, "Failed to fetch user information: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	// Generate a session ID and store the token
 	sessionID := uuid.New().String()
-	err = services.StoreAuthToken(sessionID, provider, token)
+	err = services.StoreAuthToken(sessionID, provider, user, token)
 	if err != nil {
 		http.Error(w, "Failed to store token", http.StatusInternalServerError)
 		return
@@ -123,28 +131,53 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 	http.Redirect(w, r, redirectURI, http.StatusTemporaryRedirect)
 }
 
-func (s *Server) PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string) {
+func (s *Server) PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string, params generated.PostAuthProviderLogoutParams) {
+
 	_, exists := config.Providers[provider]
 	if !exists {
 		http.Error(w, "Unsupported provider", http.StatusBadRequest)
 		return
 	}
 
+	// Retrieve session ID from cookies
 	sessionCookie, err := r.Cookie("session_id")
 	if err != nil || sessionCookie.Value == "" {
 		http.Error(w, "Session ID is required", http.StatusBadRequest)
 		return
 	}
+	sessionID := sessionCookie.Value
 
-	err = services.DeleteAuthToken(sessionCookie.Value, provider)
-	if err != nil {
-		http.Error(w, "Unable to logout", http.StatusBadRequest)
+	// Determine logout mode: Single user or all users for the provider
+	if params.UserId != nil && *params.UserId != "" {
+
+		// logging out a specific user
+		err := services.DeleteAuthToken(sessionID, provider, *params.UserId)
+		if err != nil {
+			http.Error(w, "Failed to log out user", http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Logged out user %s from provider %s", *params.UserId, provider)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": fmt.Sprintf("Successfully logged out user %s from provider %s", *params.UserId, provider),
+		})
+
 		return
 	}
 
+	// logging out all user accounts under a given provider
+	err = services.DeleteAllAuthTokensForProvider(sessionID, provider)
+	if err != nil {
+		http.Error(w, "Failed to log out all users", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Logged out all users from provider %s", provider)
+
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Logged out successfully",
+		"message": fmt.Sprintf("Successfully logged out all users from provider %s", provider),
 	})
 }
