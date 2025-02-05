@@ -8,7 +8,7 @@ servers:
   - url: http://localhost:8080
 
 paths:
-  /auth/{provider}/test:
+  /auth/{provider}/login:
     get:
       summary: Redirect to the provider's OAuth login page.
       parameters:
