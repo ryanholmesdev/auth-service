@@ -30,6 +30,12 @@ type GetAuthProviderLoginParams struct {
 	RedirectUri string `form:"redirect_uri" json:"redirect_uri"`
 }
 
+// GetAuthProviderTokenParams defines parameters for GetAuthProviderToken.
+type GetAuthProviderTokenParams struct {
+	// UserId The unique identifier of the user for whom the token is being retrieved.
+	UserId string `form:"user_id" json:"user_id"`
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// Retrieve a list of connected providers that the user is logged in with
@@ -44,9 +50,9 @@ type ServerInterface interface {
 	// Log out the user and invalidate the session.
 	// (POST /auth/{provider}/logout)
 	PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string)
-	// Retrieve an OAuth token for a specific provider.
+	// Retrieve an OAuth token for a specific provider and user.
 	// (GET /auth/{provider}/token)
-	GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string)
+	GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderTokenParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -77,9 +83,9 @@ func (_ Unimplemented) PostAuthProviderLogout(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// Retrieve an OAuth token for a specific provider.
+// Retrieve an OAuth token for a specific provider and user.
 // (GET /auth/{provider}/token)
-func (_ Unimplemented) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string) {
+func (_ Unimplemented) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string, params GetAuthProviderTokenParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -236,8 +242,26 @@ func (siw *ServerInterfaceWrapper) GetAuthProviderToken(w http.ResponseWriter, r
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAuthProviderTokenParams
+
+	// ------------- Required query parameter "user_id" -------------
+
+	if paramValue := r.URL.Query().Get("user_id"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "user_id"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "user_id", r.URL.Query(), &params.UserId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAuthProviderToken(w, r, provider)
+		siw.Handler.GetAuthProviderToken(w, r, provider, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -382,21 +406,22 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/9RWTW/jNhD9KwQve1Ft78dhoVuaoq2BADWc3VMRBIw0krhLkczMyK1r6L8XQ0l2bMfY",
-	"FIsN0JNscT7ezHsz1E5bXwWd73QJVKCNbIPXub5aLVUVULXGm9r6Wv1x1XGjOHwFT8r4UpmOG/BsCyMu",
-	"M51ptuxAfMXyFnBjC1BXq6XO9AaQhsBvZ4vZQveZDhG8iVbn+n16lelouCGBMpfYc2LDXfpfA8sjRMCU",
-	"bFnqXP8GLIluB6tMI1AMniB5vFss5FEEz+CTs4nRjVjnX0ig7DQVDbQmnZallSPjVihp2A5xeBuloocQ",
-	"HBgvsOFv00Ypc6cpBrbVVueMHUj5pXE6r4wj6LPJNTx8gYJ13/fZSYtvLLEKlSqC91AwlCpi2NgSkGaS",
-	"6cNQw7HTz6ZUCI8dEGeqtUTCDQFJd9Xyl9Hx7bnjZy9NDWj/gVKZogCSLH2mqWtbg1ud6zUwWtiAMspd",
-	"xqa4May4AdURoLKkXKhrKJX16i/LTQo6MLibnPp5YZx7MMXXb9G5Gj2uJ3uRBZoWGJB0/qfoVedJKjrT",
-	"3rTS4ylNUsFjZxHKiZQDxSMfxGh9LSBPO/SpASWaA7XPKPWzsV6ajFBahILV5/VyGADP9qfr2/Wvw1TI",
-	"BCRsjx3g9gAuhfxPyO6eF/Mx2tsucVh1zm2fziKUp7T+bnzpYBzgiYdUAXFAGGd69jxvLtTWv5S0m2T8",
-	"uowJGxwO7OyFyUGZSjg8X1TP0TQFuO/Qfhdb7xfvztlaj9HpCJ/8HmiZ+qFSv1U0NZxP51Th4Di5vKEx",
-	"xqnrc1yGLrEYA/E5yGsHBg8I39B+sYhYENqwAXoCOglHVRhaJeBIWnusj1WgU4EIgh+mkLvvvAbi0fJv",
-	"gcjUadXvt/7x3I2bL3Sc7r9TvX77DrgY7Yfu/2zv4QOrKnT+bGnchFqAHOQqErB+Y5wtZUXK+zHIBbUl",
-	"dbx0c3xKxv8TXQy35/2+wJNs8o0QLQLd26fH1jPUgHKOUCFQczHCS5SzBu7Qn43jq305iPGHc+NE5GVZ",
-	"HT4x/PESCaiMogiFrWyx322zoXIC3EyS6NDpXDfMMZ/PXSiMawJx/nHxcaH7u/7fAAAA///YPFYx0AoA",
-	"AA==",
+	"H4sIAAAAAAAC/8RW32/bNhD+Vwi+9EWxnaYYCr1lGbYZCDDDaZ+GIGDEk8SGIhXe0Z1n+H8fjpLs2rLR",
+	"dEXTJyfi/fjuvu+O3EjjSi/zjdSARTAtGe9kLq8Xc1H6IBrlVGVcJf66jlQL8k/gUCinhYpUgyNTKHaZ",
+	"yEySIQvsy5Z3EFamAHG9mMtMriBgF/hyMpvM5DaTvgWnWiNzeZU+ZbJVVCNDmXLsKZKimP6vgPjHtxBS",
+	"srmWufwDiBPddVaZDICtdwjJ4+1sxj+FdwQuOau2tT3W6SdkKBuJRQ2NSqdaGz5SdhE4DZkuDq1brujR",
+	"ewvKMWz4RzUtl7mR2Hoy5VrmFCJw+VpZmZfKImyzwdU/foKC5Ha7zY5afGuQhC9F4Z2DgkCLNviV0RBw",
+	"wpnedTUcOv2qtAjwHAEpE41BZG4QkLsr5r/1jpdjx4+Om+qD+Re0UEUByFm2mcTYNCqsZS6XQMHACoQS",
+	"9jw2QbUiQTWIiBCEQWF9VYEWxonPhuoUtGNwMzhtp4Wy9lEVT1+jc9F73Az2LIugGiAIKPO/Wa8yT1KR",
+	"mXSq4R4PaZIKnqMJoAdS9hT3fCAF4yoGedyhDzUI1hyIXUaun5Rx3OQA2gQoSHxczrsBcGQubu6Wv3dT",
+	"wROQsD1HCOs9uBTym5DdnxbzIdq7mDgso7XrL2cR9DGtfyqnLfQDPPCQKkDyAfqZnpzmzfrKuJeSdpuM",
+	"X5cxZoP8np2dMMkLVTKH40V1iqYhwEMM5rvYupq9HbO17KPjAT7+u6Nl6IdI/RatqmA8nUOFnePg8gb7",
+	"GMeup7j0MbHYeqQxyBsLKuwRvsHdYmGxBGj8CvAL0Ek4ogy+EQwOubWH+lh4PBYII/hhCrn/zmugPVj+",
+	"DSCqKq363dY/nLt+8/lI6f471uvX74Cz0X7o/s92Hs6TKH10o6Vx6ysGspcrS8C4lbJG84rk732QM2pL",
+	"6njp5viQjF93c0RnniMIo3k5lAYCX3i7evnx87n2TfrSKd2geITuKuguSn1umXCEB6N/ona7G/5hR8Je",
+	"wI0vni6644t0fHE51i6/c1oTAB/MofvVL7PZzto4ggoCmwcoA2B9NmF/fj7jS6ZlCRSDO7GCfOgE2ULB",
+	"TO5fK0m2zMb/nijhQyeIb39csfG7sXHS+n7yXoj+zEvNjRqhhkDF6TgcCMJqGLEYrMxlTdTm06n1hbK1",
+	"R8rfz97P5PZ++18AAAD//2hj+bEgDAAA",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

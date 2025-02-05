@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"auth-service/config"
+	"auth-service/generated"
 	"auth-service/services"
 	"auth-service/utils"
 	"encoding/json"
@@ -9,7 +10,7 @@ import (
 	"time"
 )
 
-func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string) {
+func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, provider string, params generated.GetAuthProviderTokenParams) {
 	_, exists := config.Providers[provider]
 	if !exists {
 		http.Error(w, "Unsupported provider", http.StatusBadRequest)
@@ -22,8 +23,14 @@ func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, pr
 		return
 	}
 
+	if params.UserId == "" {
+		http.Error(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+	userID := params.UserId
+
 	// Retrieve the token
-	token, found := services.GetAuthToken(sessionCookie.Value, "todo", provider)
+	token, found := services.GetAuthToken(sessionCookie.Value, provider, userID)
 	if !found {
 		http.Error(w, "Token not found", http.StatusNotFound)
 		return

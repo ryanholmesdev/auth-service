@@ -48,16 +48,22 @@ paths:
 
   /auth/{provider}/token:
     get:
-      summary: Retrieve an OAuth token for a specific provider.
+      summary: Retrieve an OAuth token for a specific provider and user.
       parameters:
         - name: provider
           in: path
           required: true
           schema:
             type: string
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the user for whom the token is being retrieved.
       responses:
         '200':
-          description: Returns the OAuth token.
+          description: Returns the OAuth token for the specified provider and user.
           content:
             application/json:
               schema:
@@ -65,16 +71,19 @@ paths:
                 properties:
                   access_token:
                     type: string
+                    example: "mock-access-token-1"
                   expires_in:
                     type: integer
+                    example: 3600
                   refresh_token:
                     type: string
+                    example: "mock-refresh-token-1"
         '400':
-          description: Bad request, missing session ID.
+          description: Bad request, missing session ID or user ID.
         '401':
           description: Unauthorized access.
         '404':
-          description: Token not found.
+          description: Token not found for the specified provider and user.
 
   /auth/{provider}/logout:
     post:
