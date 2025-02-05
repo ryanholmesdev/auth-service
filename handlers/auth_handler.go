@@ -102,6 +102,7 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
+	// Fetch the user information from the provider
 	user, err := services.GetUserInfo(provider, token)
 	if err != nil {
 		http.Error(w, "Failed to fetch user information: "+err.Error(), http.StatusInternalServerError)
@@ -131,7 +132,7 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 }
 
 func (s *Server) PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, provider string, params generated.PostAuthProviderLogoutParams) {
-	// Validate provider
+
 	_, exists := config.Providers[provider]
 	if !exists {
 		http.Error(w, "Unsupported provider", http.StatusBadRequest)
@@ -148,27 +149,31 @@ func (s *Server) PostAuthProviderLogout(w http.ResponseWriter, r *http.Request, 
 
 	// Determine logout mode: Single user or all users for the provider
 	if params.UserId != nil && *params.UserId != "" {
-		// Logout a specific user
+
+		// logging out a specific user
 		err := services.DeleteAuthToken(sessionID, provider, *params.UserId)
 		if err != nil {
 			http.Error(w, "Failed to log out user", http.StatusInternalServerError)
 			return
 		}
+
 		log.Printf("Logged out user %s from provider %s", *params.UserId, provider)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"message": fmt.Sprintf("Successfully logged out user %s from provider %s", *params.UserId, provider),
 		})
+
 		return
 	}
 
-	// Logout all users under the provider
+	// logging out all user accounts under a given provider
 	err = services.DeleteAllAuthTokensForProvider(sessionID, provider)
 	if err != nil {
 		http.Error(w, "Failed to log out all users", http.StatusInternalServerError)
 		return
 	}
+
 	log.Printf("Logged out all users from provider %s", provider)
 
 	w.Header().Set("Content-Type", "application/json")

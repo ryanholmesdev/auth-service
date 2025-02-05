@@ -126,7 +126,8 @@ Swagger UI: http://localhost:8080/swagger/
 3.  Implement New Endpoints
     •	Update the generated ServerInterface in your handlers package to implement the new endpoints.
 
-4. Generate Clients - oapi-codegen -generate types,client -package authclient -o ./authclient/v1/auth_client.gen.go ./openapi.yaml
+4. Generate Clients - oapi-codegen -generate types,client -package authclient -o ./auth-service-client/client.gen.go ./openapi.yaml
+
 example:
 
 `func (s *Server) RefreshAuthToken(w http.ResponseWriter, r *http.Request, provider string) {
