@@ -106,7 +106,7 @@ func Test_GetAuthStatus_ShouldReturnConnectedProviders(t *testing.T) {
 	assert.True(t, foundUser2, "User 2 should be in the response")
 }
 
-func Test_GetAuthStatus_ShouldReturnNonConnectedProviders(t *testing.T) {
+func Test_GetAuthStatus_ShouldReturnUnauthorised(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -121,15 +121,6 @@ func Test_GetAuthStatus_ShouldReturnNonConnectedProviders(t *testing.T) {
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Ensure response is 200 but empty list
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
-
-	var response []services.LoggedInProvider
-	err = json.Unmarshal(bodyBytes, &response)
-	assert.NoError(t, err)
-
-	assert.Empty(t, response, "Response should be an empty array when no providers are logged in")
+	// Unauthorized response
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 }

@@ -165,9 +165,7 @@ paths:
                       display_name: "Alice Smith"
                       email: "alice@example.com"
                       logged_in: true
-                No Providers Logged In:
-                  value: [ ]
         '400':
           description: Bad request, missing session ID.
         '401':
-          description: Unauthorized access.
+          description: Unauthorized access meaning user is not connected to any providers.

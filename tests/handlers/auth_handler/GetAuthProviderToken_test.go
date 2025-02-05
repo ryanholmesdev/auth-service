@@ -71,7 +71,7 @@ func Test_GetAuthProviderToken_MissingUserID_ShouldReturn400(t *testing.T) {
 
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(body), "Query parameter user_id is required")
+	assert.Contains(t, string(body), "Query argument user_id is required, but not found")
 }
 
 func Test_GetAuthProviderToken_TokenNotFound_ShouldReturn404(t *testing.T) {
