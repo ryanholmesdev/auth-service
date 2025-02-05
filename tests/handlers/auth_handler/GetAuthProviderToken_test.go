@@ -71,7 +71,7 @@ func Test_GetAuthProviderToken_MissingUserID_ShouldReturn400(t *testing.T) {
 
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(body), "Query argument user_id is required, but not found")
+	assert.Contains(t, string(body), "Query parameter user_id is required")
 }
 
 func Test_GetAuthProviderToken_TokenNotFound_ShouldReturn404(t *testing.T) {
@@ -102,13 +102,22 @@ func Test_GetAuthProviderToken_ValidToken_ShouldReturn200(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
+	// Create mock token
 	validToken := &oauth2.Token{
 		AccessToken:  "valid-access-token",
 		RefreshToken: "valid-refresh-token",
 		Expiry:       time.Now().Add(1 * time.Hour),
 	}
 
-	err := services.StoreAuthToken("mock-session-id", "spotify", "mock-user-id", validToken)
+	// Create user info
+	mockUser := &services.UserInfo{
+		ID:          "mock-user-id",
+		DisplayName: "John Doe",
+		Email:       "john@example.com",
+	}
+
+	// Store both token and user info in Redis
+	err := services.StoreAuthToken("mock-session-id", "spotify", mockUser, validToken)
 	assert.NoError(t, err)
 
 	url := setup.Server.URL + "/auth/spotify/token?user_id=mock-user-id"

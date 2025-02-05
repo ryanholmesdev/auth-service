@@ -203,7 +203,9 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{
-			"id": "mock-user-id"
+			"id": "mock-user-id",
+			"display_name": "Mock User",
+			"email": "mockuser@googlemail.com",
 		}`))
 	})
 
@@ -239,5 +241,5 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 	// Validate token storage in Redis with user ID
 	token, found := services.GetAuthToken(sessionCookie[0].Value, "spotify", "mock-user-id")
 	assert.True(t, found)
-	assert.Equal(t, "mocked-access-token", token.AccessToken)
+	assert.Equal(t, "mocked-access-token", token.Token.AccessToken)
 }

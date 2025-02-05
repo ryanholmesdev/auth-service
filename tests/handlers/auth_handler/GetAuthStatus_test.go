@@ -10,9 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
 	"golang.org/x/oauth2"
 )
 
@@ -20,28 +19,38 @@ func Test_GetAuthStatus_ShouldReturnConnectedProviders(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
-	// Mock a session and token in Redis
+	// Mock session and tokens
 	sessionID := uuid.New().String()
 	mockToken1 := &oauth2.Token{
 		AccessToken:  "mock-access-token-1",
 		RefreshToken: "mock-refresh-token-1",
 		Expiry:       time.Now().Add(time.Hour),
 	}
-
 	mockToken2 := &oauth2.Token{
 		AccessToken:  "mock-access-token-2",
 		RefreshToken: "mock-refresh-token-2",
 		Expiry:       time.Now().Add(time.Hour),
 	}
 
-	// Store spotify token in redis
-	err := services.StoreAuthToken(sessionID, "spotify", "mock-user1-id", mockToken1)
+	// Create user info for mock users
+	mockUser1 := &services.UserInfo{
+		ID:          "mock-user1-id",
+		DisplayName: "User One",
+		Email:       "user1@example.com",
+	}
+	mockUser2 := &services.UserInfo{
+		ID:          "mock-user2-id",
+		DisplayName: "User Two",
+		Email:       "user2@example.com",
+	}
+
+	// Store tokens in Redis
+	err := services.StoreAuthToken(sessionID, "spotify", mockUser1, mockToken1)
+	assert.NoError(t, err)
+	err = services.StoreAuthToken(sessionID, "spotify", mockUser2, mockToken2)
 	assert.NoError(t, err)
 
-	err = services.StoreAuthToken(sessionID, "spotify", "mock-user2-id", mockToken2)
-	assert.NoError(t, err)
-
-	// Create a client with a cookie jar to store session cookies
+	// Create an HTTP client with a cookie jar
 	jar, err := cookiejar.New(nil)
 	assert.NoError(t, err)
 
@@ -53,8 +62,6 @@ func Test_GetAuthStatus_ShouldReturnConnectedProviders(t *testing.T) {
 	baseURL := setup.Server.URL + "/auth/status"
 	req, err := http.NewRequest("GET", baseURL, nil)
 	assert.NoError(t, err)
-
-	// Attach the session cookie
 	req.AddCookie(&http.Cookie{
 		Name:  "session_id",
 		Value: sessionID,
@@ -65,30 +72,38 @@ func Test_GetAuthStatus_ShouldReturnConnectedProviders(t *testing.T) {
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Result
+	// Validate status code
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
+	// Parse the response
 	bodyBytes, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 
-	// Parse the response
 	var response []services.LoggedInProvider
 	err = json.Unmarshal(bodyBytes, &response)
 	assert.NoError(t, err)
 
-	assert.Len(t, response, 2, "Should return 2 logged-in Spotify accounts")
+	// Should return 2 logged-in providers
+	assert.Len(t, response, 2)
 
-	// Validate both accounts are listed and tokens are correct
-	assert.Contains(t, response, services.LoggedInProvider{
-		Provider: "spotify",
-		User:     "mock-user1-id",
-		LoggedIn: true,
-	})
-	assert.Contains(t, response, services.LoggedInProvider{
-		Provider: "spotify",
-		User:     "mock-user2-id",
-		LoggedIn: true,
-	})
+	// Validate both accounts are present
+	var foundUser1, foundUser2 bool
+	for _, provider := range response {
+		if provider.Provider == "spotify" && provider.UserID == mockUser1.ID {
+			foundUser1 = true
+			assert.Equal(t, mockUser1.DisplayName, provider.DisplayName)
+			assert.Equal(t, mockUser1.Email, provider.Email)
+			assert.True(t, provider.LoggedIn)
+		}
+		if provider.Provider == "spotify" && provider.UserID == mockUser2.ID {
+			foundUser2 = true
+			assert.Equal(t, mockUser2.DisplayName, provider.DisplayName)
+			assert.Equal(t, mockUser2.Email, provider.Email)
+			assert.True(t, provider.LoggedIn)
+		}
+	}
+	assert.True(t, foundUser1, "User 1 should be in the response")
+	assert.True(t, foundUser2, "User 2 should be in the response")
 }
 
 func Test_GetAuthStatus_ShouldReturnNonConnectedProviders(t *testing.T) {
@@ -106,6 +121,15 @@ func Test_GetAuthStatus_ShouldReturnNonConnectedProviders(t *testing.T) {
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Result
-	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+	// Ensure response is 200 but empty list
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	assert.NoError(t, err)
+
+	var response []services.LoggedInProvider
+	err = json.Unmarshal(bodyBytes, &response)
+	assert.NoError(t, err)
+
+	assert.Empty(t, response, "Response should be an empty array when no providers are logged in")
 }

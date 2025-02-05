@@ -71,10 +71,22 @@ func Test_PostAuthProviderLogout_SingleUser_ShouldReturn200(t *testing.T) {
 	provider := "spotify"
 	userID := "mock-user-1"
 
+	// Create mock user info
+	mockUser1 := &services.UserInfo{
+		ID:          userID,
+		DisplayName: "User One",
+		Email:       "user1@example.com",
+	}
+	mockUser2 := &services.UserInfo{
+		ID:          "mock-user-2",
+		DisplayName: "User Two",
+		Email:       "user2@example.com",
+	}
+
 	// Store two mock tokens in Redis
-	err := services.StoreAuthToken(sessionID, provider, userID, createMockOAuthToken())
+	err := services.StoreAuthToken(sessionID, provider, mockUser1, createMockOAuthToken())
 	assert.NoError(t, err)
-	err = services.StoreAuthToken(sessionID, provider, "mock-user-2", createMockOAuthToken())
+	err = services.StoreAuthToken(sessionID, provider, mockUser2, createMockOAuthToken())
 	assert.NoError(t, err)
 
 	// Verify token exists before logout
@@ -103,7 +115,7 @@ func Test_PostAuthProviderLogout_SingleUser_ShouldReturn200(t *testing.T) {
 
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(body), "Successfully logged out user")
+	assert.Contains(t, string(body), "Successfully logged out user mock-user-1")
 
 	// Verify that only the specified user's token was deleted
 	_, found = services.GetAuthToken(sessionID, provider, userID)
@@ -120,10 +132,22 @@ func Test_PostAuthProviderLogout_AllUsers_ShouldReturn200(t *testing.T) {
 	sessionID := "test-session-id"
 	provider := "spotify"
 
+	// Create mock user info
+	mockUser1 := &services.UserInfo{
+		ID:          "mock-user-1",
+		DisplayName: "User One",
+		Email:       "user1@example.com",
+	}
+	mockUser2 := &services.UserInfo{
+		ID:          "mock-user-2",
+		DisplayName: "User Two",
+		Email:       "user2@example.com",
+	}
+
 	// Store mock tokens for multiple users
-	err := services.StoreAuthToken(sessionID, provider, "mock-user-1", createMockOAuthToken())
+	err := services.StoreAuthToken(sessionID, provider, mockUser1, createMockOAuthToken())
 	assert.NoError(t, err)
-	err = services.StoreAuthToken(sessionID, provider, "mock-user-2", createMockOAuthToken())
+	err = services.StoreAuthToken(sessionID, provider, mockUser2, createMockOAuthToken())
 	assert.NoError(t, err)
 
 	// Verify tokens exist before logout
@@ -154,7 +178,7 @@ func Test_PostAuthProviderLogout_AllUsers_ShouldReturn200(t *testing.T) {
 
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(body), "Successfully logged out all users")
+	assert.Contains(t, string(body), "Successfully logged out all users from provider spotify")
 
 	// Verify all tokens were deleted
 	_, found1 = services.GetAuthToken(sessionID, provider, "mock-user-1")
