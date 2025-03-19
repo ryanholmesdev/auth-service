@@ -22,8 +22,18 @@ func InitConfig() {
 				TokenURL: "https://accounts.spotify.com/api/token",
 			},
 		},
+		"tidal": {
+			ClientID:     getEnv("TIDAL_CLIENT_ID", ""),
+			ClientSecret: getEnv("TIDAL_CLIENT_SECRET", ""),
+			RedirectURL:  getEnv("TIDAL_REDIRECT_URL", ""),
+			Scopes:       []string{"playlists.read", "collection.read", "playlists.write", "user.read"},
+			Endpoint: oauth2.Endpoint{
+				AuthURL:   "https://login.tidal.com/authorize",
+				TokenURL:  "https://auth.tidal.com/v1/oauth2/token",
+				AuthStyle: oauth2.AuthStyleInParams,
+			},
+		},
 	}
-
 	validateProviders()
 }
 
@@ -53,7 +63,7 @@ var GetProviderUserInfoURL = func(provider string) (string, error) {
 	case "spotify":
 		return "https://api.spotify.com/v1/me", nil
 	case "tidal":
-		return "https://api.tidal.com/v1/me", nil
+		return "https://openapi.tidal.com/v2/users/me", nil
 	default:
 		return "", fmt.Errorf("provider not supported: %s", provider)
 	}

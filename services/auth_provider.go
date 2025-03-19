@@ -2,79 +2,128 @@ package services
 
 import (
 	"auth-service/config"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/oauth2"
-	"net/http"
-	"regexp"
+	"net/mail"
 	"strings"
+
+	"github.com/go-resty/resty/v2"
+	"golang.org/x/oauth2"
 )
 
-// UserInfo holds the user details retrieved from the provider
-type UserInfo struct {
+type SpotifyUserInfo struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
 	Email       string `json:"email"`
 }
 
-// validateEmail checks if an email is valid
-func validateEmail(email string) bool {
-	emailRegex := `^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`
-	re := regexp.MustCompile(emailRegex)
-	return re.MatchString(email)
+type TidalUserResponse struct {
+	Data struct {
+		ID         string `json:"id"`
+		Attributes struct {
+			Username      string `json:"username"`
+			Email         string `json:"email"`
+			EmailVerified bool   `json:"emailVerified"`
+			Country       string `json:"country"`
+		} `json:"attributes"`
+	} `json:"data"`
 }
 
-// GetUserInfo retrieves the user's unique ID, name, and email from the provider's API
+type UserInfo struct {
+	ID          string
+	DisplayName string
+	Email       string
+}
+
+type ProviderResponse interface {
+	ToUserInfo() (*UserInfo, error)
+}
+
+func (s *SpotifyUserInfo) ToUserInfo() (*UserInfo, error) {
+	if strings.TrimSpace(s.ID) == "" {
+		return nil, errors.New("user ID is missing in response")
+	}
+	if strings.TrimSpace(s.DisplayName) == "" {
+		return nil, errors.New("display name is missing in response")
+	}
+	if strings.TrimSpace(s.Email) == "" || !validateEmail(s.Email) {
+		return nil, errors.New("invalid email format or missing email")
+	}
+	return &UserInfo{
+		ID:          s.ID,
+		DisplayName: s.DisplayName,
+		Email:       s.Email,
+	}, nil
+}
+
+func (t *TidalUserResponse) ToUserInfo() (*UserInfo, error) {
+	data := t.Data
+	if strings.TrimSpace(data.ID) == "" {
+		return nil, errors.New("user ID is missing in response")
+	}
+	if strings.TrimSpace(data.Attributes.Username) == "" {
+		return nil, errors.New("username is missing in response")
+	}
+	if strings.TrimSpace(data.Attributes.Email) == "" || !validateEmail(data.Attributes.Email) {
+		return nil, errors.New("invalid email format or missing email")
+	}
+	return &UserInfo{
+		ID:          data.ID,
+		DisplayName: data.Attributes.Username,
+		Email:       data.Attributes.Email,
+	}, nil
+}
+
+func validateEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+func makeAuthenticatedRequest[T any, P interface {
+	*T
+	ProviderResponse
+}](url string, token *oauth2.Token) (P, error) {
+	var result T
+	client := resty.New()
+
+	resp, err := client.R().
+		SetHeader("Authorization", "Bearer "+token.AccessToken).
+		SetResult(&result).
+		Get(url)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode() != 200 {
+		return nil, errors.New("provider returned non-200 status")
+	}
+	return P(&result), nil
+}
+
 func GetUserInfo(provider string, token *oauth2.Token) (*UserInfo, error) {
-	// Get the provider's user info endpoint URL
 	url, err := config.GetProviderUserInfoURL(provider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get provider user info URL: %w", err)
 	}
 
-	// Create an HTTP request
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+	var response ProviderResponse
+	switch provider {
+	case "spotify":
+		spotifyUser, err := makeAuthenticatedRequest[SpotifyUserInfo, *SpotifyUserInfo](url, token)
+		if err != nil {
+			return nil, err
+		}
+		response = spotifyUser
+
+	case "tidal":
+		tidalUser, err := makeAuthenticatedRequest[TidalUserResponse, *TidalUserResponse](url, token)
+		if err != nil {
+			return nil, err
+		}
+		response = tidalUser
+
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
 
-	// Attach Authorization header
-	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
-
-	// Make the request
-	client := http.DefaultClient
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Handle non-200 responses
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("provider returned non-200 status: %d", resp.StatusCode)
-	}
-
-	// Parse the JSON response
-	var user UserInfo
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	if strings.TrimSpace(user.ID) == "" {
-		return nil, errors.New("user ID is missing in response")
-	}
-
-	if strings.TrimSpace(user.DisplayName) == "" {
-		return nil, errors.New("display name is missing in response")
-	}
-
-	if strings.TrimSpace(user.Email) == "" {
-		return nil, errors.New("email is missing in response")
-	}
-	if !validateEmail(user.Email) {
-		return nil, errors.New("invalid email format")
-	}
-
-	return &user, nil
+	return response.ToUserInfo()
 }
