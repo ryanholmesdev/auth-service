@@ -1,6 +1,7 @@
 package services
 
 import (
+	"auth-service/models"
 	"auth-service/redisclient"
 	"context"
 	"encoding/json"
@@ -25,7 +26,7 @@ type AuthData struct {
 }
 
 // StoreAuthToken stores OAuth token and user info in Redis
-func StoreAuthToken(sessionID, provider string, userInfo *UserInfo, token *oauth2.Token) error {
+func StoreAuthToken(sessionID, provider string, userInfo *models.UserInfo, token *oauth2.Token) error {
 	key := constructRedisKey(sessionID, provider, userInfo.ID)
 
 	authData := AuthData{
