@@ -14,7 +14,7 @@ type PKCEData struct {
 
 // StorePKCEData stores the PKCE data (including the code verifier) in Redis,
 // using the state token as the key.
-func StorePKCEData(stateToken, codeVerifier string) error {
+var StorePKCEData = func(stateToken, codeVerifier string) error {
 	key := "pkce:" + stateToken
 	data := PKCEData{
 		CodeVerifier: codeVerifier,

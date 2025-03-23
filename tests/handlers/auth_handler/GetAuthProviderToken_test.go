@@ -1,6 +1,7 @@
 package auth_handler
 
 import (
+	"auth-service/models"
 	"auth-service/services"
 	"auth-service/tests"
 	"encoding/json"
@@ -110,7 +111,7 @@ func Test_GetAuthProviderToken_ValidToken_ShouldReturn200(t *testing.T) {
 	}
 
 	// Create user info
-	mockUser := &services.UserInfo{
+	mockUser := &models.UserInfo{
 		ID:          "mock-user-id",
 		DisplayName: "John Doe",
 		Email:       "john@example.com",

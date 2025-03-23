@@ -70,3 +70,10 @@ func GetUserInfo(ctx context.Context, provider string, token *oauth2.Token) (*mo
 
 	return response.ToUserInfo()
 }
+
+// UserInfo is our normalized user info structure
+type UserInfo struct {
+	ID          string
+	DisplayName string
+	Email       string
+}

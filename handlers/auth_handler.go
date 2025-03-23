@@ -5,34 +5,15 @@ import (
 	"auth-service/generated"
 	"auth-service/services"
 	"auth-service/utils"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"golang.org/x/oauth2"
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/google/uuid"
+	"golang.org/x/oauth2"
 )
-
-// generateCodeVerifier creates a high-entropy random string.
-func generateCodeVerifier() (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
-// generateCodeChallenge returns the SHA256 hash of the verifier, base64 URL-encoded.
-func generateCodeChallenge(verifier string) string {
-	h := sha256.New()
-	h.Write([]byte(verifier))
-	sum := h.Sum(nil)
-	return base64.RawURLEncoding.EncodeToString(sum)
-}
 
 // GetAuthProviderLogin handles login requests.
 func (s *Server) GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, provider string, params generated.GetAuthProviderLoginParams) {
@@ -44,9 +25,8 @@ func (s *Server) GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, pr
 
 	// Access and validate the redirect URI.
 	redirectURI := params.RedirectUri
-	allowedDomains, err := utils.GetAllowedRedirectDomains()
-	if err != nil || !utils.ValidateRedirectURI(redirectURI, allowedDomains) {
-		http.Error(w, "Invalid redirect URI", http.StatusBadRequest)
+	if err := utils.ValidateRedirectURIFromEnv(redirectURI); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -55,12 +35,12 @@ func (s *Server) GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, pr
 	state := stateToken + "|" + redirectURI
 
 	// Generate the PKCE code verifier and corresponding challenge.
-	verifier, err := generateCodeVerifier()
+	verifier, err := utils.GenerateCodeVerifier()
 	if err != nil {
 		http.Error(w, "Server error while generating code verifier", http.StatusInternalServerError)
 		return
 	}
-	challenge := generateCodeChallenge(verifier)
+	challenge := utils.GenerateCodeChallenge(verifier)
 
 	// Store the PKCE data (here, the code verifier) in Redis using the state token as key.
 	// (services.StorePKCEData should marshal the data as needed and set a TTL.)
@@ -74,7 +54,7 @@ func (s *Server) GetAuthProviderLogin(w http.ResponseWriter, r *http.Request, pr
 		state,
 		oauth2.SetAuthURLParam("code_challenge", challenge),
 		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
-		oauth2.AccessTypeOffline, // Include if offline access is required.
+		oauth2.AccessTypeOffline,
 	)
 
 	// Redirect the user to the OAuth provider.
@@ -99,9 +79,8 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 	redirectURI := parts[1]
 
 	// Validate the redirect URI.
-	allowedDomains, err := utils.GetAllowedRedirectDomains()
-	if err != nil || !utils.ValidateRedirectURI(redirectURI, allowedDomains) {
-		http.Error(w, "Invalid redirect URI", http.StatusBadRequest)
+	if err := utils.ValidateRedirectURIFromEnv(redirectURI); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -135,7 +114,7 @@ func (s *Server) GetAuthProviderCallback(w http.ResponseWriter, r *http.Request,
 	}
 
 	// Fetch the user information from the provider.
-	user, err := services.GetUserInfo(provider, token)
+	user, err := services.GetUserInfo(r.Context(), provider, token)
 	if err != nil {
 		http.Error(w, "Failed to fetch user information: "+err.Error(), http.StatusInternalServerError)
 		return

@@ -3,6 +3,7 @@ package auth_handler
 import (
 	"auth-service/services"
 	"auth-service/tests"
+	"auth-service/tests/mocks"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -12,53 +13,35 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/oauth2"
 )
 
 func Test_GetAuthStatus_ShouldReturnConnectedProviders(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
-
-	// Mock session and tokens
 	sessionID := uuid.New().String()
-	mockToken1 := &oauth2.Token{
-		AccessToken:  "mock-access-token-1",
-		RefreshToken: "mock-refresh-token-1",
-		Expiry:       time.Now().Add(time.Hour),
-	}
-	mockToken2 := &oauth2.Token{
-		AccessToken:  "mock-access-token-2",
-		RefreshToken: "mock-refresh-token-2",
-		Expiry:       time.Now().Add(time.Hour),
-	}
 
-	// Create user info for mock users
-	mockUser1 := &services.UserInfo{
-		ID:          "mock-user1-id",
-		DisplayName: "User One",
-		Email:       "user1@example.com",
-	}
-	mockUser2 := &services.UserInfo{
-		ID:          "mock-user2-id",
-		DisplayName: "User Two",
-		Email:       "user2@example.com",
-	}
+	mockSpotifyToken1 := mocks.NewMockOAuth2Token("spotify-1", time.Hour)
+	mockSpotifyToken2 := mocks.NewMockOAuth2Token("spotify-2", time.Hour)
+	mockTidalToken := mocks.NewMockOAuth2Token("tidal", time.Hour)
 
-	// Store tokens in Redis
-	err := services.StoreAuthToken(sessionID, "spotify", mockUser1, mockToken1)
+	mockSpotifyUser1 := mocks.NewMockUser("spotify", "mock-spotify-user1-id", "Spotify User One", "spotify1@example.com")
+	mockSpotifyUser2 := mocks.NewMockUser("spotify", "mock-spotify-user2-id", "Spotify User Two", "spotify2@example.com")
+	mockTidalUser := mocks.NewMockUser("tidal", "mock-tidal-user-id", "Tidal User", "tidal@example.com")
+
+	// Store tokens in Redis.
+	err := services.StoreAuthToken(sessionID, "spotify", mockSpotifyUser1, mockSpotifyToken1)
 	assert.NoError(t, err)
-	err = services.StoreAuthToken(sessionID, "spotify", mockUser2, mockToken2)
+	err = services.StoreAuthToken(sessionID, "spotify", mockSpotifyUser2, mockSpotifyToken2)
+	assert.NoError(t, err)
+	err = services.StoreAuthToken(sessionID, "tidal", mockTidalUser, mockTidalToken)
 	assert.NoError(t, err)
 
-	// Create an HTTP client with a cookie jar
+	// Create an HTTP client with a cookie jar.
 	jar, err := cookiejar.New(nil)
 	assert.NoError(t, err)
+	client := &http.Client{Jar: jar}
 
-	client := &http.Client{
-		Jar: jar,
-	}
-
-	// Add the session cookie to the request
+	// Prepare the request with the session cookie.
 	baseURL := setup.Server.URL + "/auth/status"
 	req, err := http.NewRequest("GET", baseURL, nil)
 	assert.NoError(t, err)
@@ -67,15 +50,15 @@ func Test_GetAuthStatus_ShouldReturnConnectedProviders(t *testing.T) {
 		Value: sessionID,
 	})
 
-	// Perform the request
+	// Perform the request.
 	resp, err := client.Do(req)
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Validate status code
+	// Validate the status code.
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Parse the response
+	// Parse the response.
 	bodyBytes, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 
@@ -83,27 +66,34 @@ func Test_GetAuthStatus_ShouldReturnConnectedProviders(t *testing.T) {
 	err = json.Unmarshal(bodyBytes, &response)
 	assert.NoError(t, err)
 
-	// Should return 2 logged-in providers
-	assert.Len(t, response, 2)
+	// Expect three logged-in providers.
+	assert.Len(t, response, 3)
 
-	// Validate both accounts are present
-	var foundUser1, foundUser2 bool
+	// Validate that both Spotify accounts and the Tidal account are present.
+	var foundSpotify1, foundSpotify2, foundTidal bool
 	for _, provider := range response {
-		if provider.Provider == "spotify" && provider.UserID == mockUser1.ID {
-			foundUser1 = true
-			assert.Equal(t, mockUser1.DisplayName, provider.DisplayName)
-			assert.Equal(t, mockUser1.Email, provider.Email)
+		if provider.Provider == "spotify" && provider.UserID == mockSpotifyUser1.ID {
+			foundSpotify1 = true
+			assert.Equal(t, mockSpotifyUser1.DisplayName, provider.DisplayName)
+			assert.Equal(t, mockSpotifyUser1.Email, provider.Email)
 			assert.True(t, provider.LoggedIn)
 		}
-		if provider.Provider == "spotify" && provider.UserID == mockUser2.ID {
-			foundUser2 = true
-			assert.Equal(t, mockUser2.DisplayName, provider.DisplayName)
-			assert.Equal(t, mockUser2.Email, provider.Email)
+		if provider.Provider == "spotify" && provider.UserID == mockSpotifyUser2.ID {
+			foundSpotify2 = true
+			assert.Equal(t, mockSpotifyUser2.DisplayName, provider.DisplayName)
+			assert.Equal(t, mockSpotifyUser2.Email, provider.Email)
+			assert.True(t, provider.LoggedIn)
+		}
+		if provider.Provider == "tidal" && provider.UserID == mockTidalUser.ID {
+			foundTidal = true
+			assert.Equal(t, mockTidalUser.DisplayName, provider.DisplayName)
+			assert.Equal(t, mockTidalUser.Email, provider.Email)
 			assert.True(t, provider.LoggedIn)
 		}
 	}
-	assert.True(t, foundUser1, "User 1 should be in the response")
-	assert.True(t, foundUser2, "User 2 should be in the response")
+	assert.True(t, foundSpotify1, "Spotify User One should be in the response")
+	assert.True(t, foundSpotify2, "Spotify User Two should be in the response")
+	assert.True(t, foundTidal, "Tidal User should be in the response")
 }
 
 func Test_GetAuthStatus_ShouldReturnUnauthorised(t *testing.T) {

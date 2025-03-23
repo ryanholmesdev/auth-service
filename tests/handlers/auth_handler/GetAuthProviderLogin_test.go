@@ -97,7 +97,7 @@ func Test_WhenRedirectURIIsInvalid_ShouldReturn400(t *testing.T) {
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(bodyBytes), "Invalid redirect URI")
+	assert.Contains(t, string(bodyBytes), "invalid redirect URI")
 }
 
 func Test_WhenStateTokenStorageFails_ShouldReturn500(t *testing.T) {
@@ -105,13 +105,13 @@ func Test_WhenStateTokenStorageFails_ShouldReturn500(t *testing.T) {
 	defer setup.Cleanup()
 
 	// Mock StoreStateToken to simulate a failure
-	originalStoreStateToken := services.StoreStateToken
-	services.StoreStateToken = func(stateToken string) error {
+	originalStorePKCEData := services.StorePKCEData
+	services.StorePKCEData = func(stateToken string, verifier string) error {
 		return fmt.Errorf("redis internal failed")
 	}
 	defer func() {
 		// Restore original function
-		services.StoreStateToken = originalStoreStateToken
+		services.StorePKCEData = originalStorePKCEData
 	}()
 
 	// Arrange
@@ -131,7 +131,7 @@ func Test_WhenStateTokenStorageFails_ShouldReturn500(t *testing.T) {
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(bodyBytes), "Server error while storing state")
+	assert.Contains(t, string(bodyBytes), "Server error while storing PKCE data")
 }
 
 func Test_WhenOAuthLoginIsTriggered_ShouldRedirectToProvider(t *testing.T) {

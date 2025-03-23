@@ -94,7 +94,7 @@ func Test_Callback_InvalidRedirectURI_ShouldReturn400(t *testing.T) {
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(bodyBytes), "Invalid redirect URI")
+	assert.Contains(t, string(bodyBytes), "invalid redirect URI")
 }
 
 // Test: Invalid State Token
@@ -127,20 +127,22 @@ func Test_Callback_MissingAuthorizationCode_ShouldReturn400(t *testing.T) {
 	provider := "spotify"
 	baseURL := setup.Server.URL + "/auth/" + provider + "/callback"
 
-	// Store a valid state token in Redis
-	err := services.StoreStateToken("mock-state")
+	// Instead of storing an auth token, store the PKCE data using the state token.
+	// Here, we use "mock-code-verifier" as the code verifier.
+	err := services.StorePKCEData("mock-state", "mock-code-verifier")
 	assert.NoError(t, err)
 
-	// Build callback URL WITHOUT the "code" parameter
+	// Build callback URL WITHOUT the "code" parameter.
+	// The state parameter now is in the format "stateToken|redirectURI".
 	reqURL, err := buildCallbackURL(baseURL, "", "mock-state|http://localhost:3000/callback")
 	assert.NoError(t, err)
 
-	// Act: Call the callback endpoint
+	// Act: Call the callback endpoint.
 	resp, err := http.Get(reqURL.String())
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Assert: Should return 400 due to missing authorization code
+	// Assert: Should return 400 due to missing authorization code.
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 
 	bodyBytes, err := io.ReadAll(resp.Body)
@@ -161,7 +163,7 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 	os.Setenv("ALLOWED_REDIRECT_DOMAINS", "localhost,127.0.0.1")
 	defer os.Unsetenv("ALLOWED_REDIRECT_DOMAINS")
 
-	// Mock OAuth Config
+	// Mock OAuth Config for Spotify.
 	originalConfig := config.Providers["spotify"]
 	mockConfig := *originalConfig
 	mockConfig.RedirectURL = mockRedirectURI
@@ -171,7 +173,7 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 	}
 	config.Providers["spotify"] = &mockConfig
 
-	// Mock GetProviderUserInfoURL
+	// Mock GetProviderUserInfoURL.
 	originalGetProviderUserInfoURL := config.GetProviderUserInfoURL
 	config.GetProviderUserInfoURL = func(provider string) (string, error) {
 		if provider == "spotify" {
@@ -181,11 +183,14 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 	}
 	defer func() { config.GetProviderUserInfoURL = originalGetProviderUserInfoURL }()
 
-	// Store a valid state token in Redis
-	err := services.StoreStateToken("mock-state")
+	// Instead of pre-storing an auth token, store PKCE data with the state token.
+	stateToken := "mock-state"
+	codeVerifier := "mock-code-verifier"
+	err := services.StorePKCEData(stateToken, codeVerifier)
 	assert.NoError(t, err)
 
-	// Mock token exchange response
+	// The callback endpoint will call the provider’s /me endpoint to get user info.
+	// We'll mock that endpoint to return a specific user.
 	router := setup.Server.Config.Handler.(*chi.Mux)
 	router.Post("/mock-oauth/token", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -197,49 +202,55 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 			"token_type": "Bearer"
 		}`))
 	})
-
-	// Mock Spotify `/me` API response to return a user ID
 	router.Get("/mock-oauth/me", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		// Return user info matching what the callback will later use.
 		w.Write([]byte(`{
-		"id": "mock-user-id",
-		"display_name": "Mock User",
-		"email": "mockuser@googlemail.com"
-	}`))
+			"id": "mock-user-id",
+			"display_name": "Mock User",
+			"email": "mockuser@googlemail.com"
+		}`))
 	})
 
-	// Build callback URL with valid state and code
-	reqURL, err := buildCallbackURL(setup.Server.URL+"/auth/spotify/callback", "mock-auth-code", "mock-state|"+mockRedirectURI)
+	// Build callback URL with valid state and code.
+	// Notice the state parameter is now "mock-state|{redirectURI}".
+	reqURL, err := buildCallbackURL(setup.Server.URL+"/auth/spotify/callback", "mock-auth-code", stateToken+"|"+mockRedirectURI)
 	assert.NoError(t, err)
 
-	// Custom HTTP client to prevent automatic redirects
+	// Use a custom HTTP client that prevents automatic redirects.
 	client := &http.Client{
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse // Prevents following redirects
+			return http.ErrUseLastResponse
 		},
 	}
 
-	// Act: Call the callback endpoint
+	// Act: Call the callback endpoint.
 	resp, err := client.Get(reqURL.String())
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	// Assert: Should redirect (307) to the frontend
+	// Assert: The callback should redirect (307) to the original redirect URI.
 	assert.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode)
-
-	// Validate the redirect URL
 	redirectLocation, err := resp.Location()
 	assert.NoError(t, err)
 	assert.Equal(t, mockRedirectURI, redirectLocation.String())
 
-	// Validate session cookie
+	// Validate that a session cookie was set.
 	sessionCookie := resp.Cookies()
 	assert.NotEmpty(t, sessionCookie)
-	assert.Equal(t, "session_id", sessionCookie[0].Name)
+	var cookie *http.Cookie
+	for _, c := range sessionCookie {
+		if c.Name == "session_id" {
+			cookie = c
+			break
+		}
+	}
+	assert.NotNil(t, cookie)
 
-	// Validate token storage in Redis with user ID
-	token, found := services.GetAuthToken(sessionCookie[0].Value, "spotify", "mock-user-id")
+	// Validate token storage in Redis.
+	// The callback should have stored the token under the new session cookie value.
+	token, found := services.GetAuthToken(cookie.Value, "spotify", "mock-user-id")
 	assert.True(t, found)
 	assert.Equal(t, "mocked-access-token", token.Token.AccessToken)
 }

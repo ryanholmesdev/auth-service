@@ -9,6 +9,17 @@ import (
 	"strings"
 )
 
+func ValidateRedirectURIFromEnv(uri string) error {
+	allowedDomains, err := GetAllowedRedirectDomains()
+	if err != nil {
+		return err
+	}
+	if !ValidateRedirectURI(uri, allowedDomains) {
+		return fmt.Errorf("invalid redirect URI")
+	}
+	return nil
+}
+
 func GetAllowedRedirectDomains() ([]string, error) {
 	domains := os.Getenv("ALLOWED_REDIRECT_DOMAINS")
 	if domains == "" {
@@ -19,7 +30,6 @@ func GetAllowedRedirectDomains() ([]string, error) {
 
 // ValidateRedirectURI checks if the URI is valid and belongs to an allowed domain.
 func ValidateRedirectURI(uri string, allowedDomains []string) bool {
-	return true
 	parsedURL, err := url.Parse(uri)
 	if err != nil {
 		return false // Invalid URL
