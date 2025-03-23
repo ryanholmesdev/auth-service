@@ -151,7 +151,7 @@ func Test_Callback_MissingAuthorizationCode_ShouldReturn400(t *testing.T) {
 }
 
 // Test: Successful Callback Flow
-func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
+func Test_Callback_Spotify_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
 
@@ -251,6 +251,116 @@ func Test_Callback_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
 	// Validate token storage in Redis.
 	// The callback should have stored the token under the new session cookie value.
 	token, found := services.GetAuthToken(cookie.Value, "spotify", "mock-user-id")
+	assert.True(t, found)
+	assert.Equal(t, "mocked-access-token", token.Token.AccessToken)
+}
+
+func Test_Callback_Tidal_SuccessfulFlow_ShouldRedirectAndStoreToken(t *testing.T) {
+	setup := tests.InitializeTestEnvironment(t)
+	defer setup.Cleanup()
+
+	// Define mock URLs.
+	mockAuthURL := setup.Server.URL + "/mock-oauth/authorize"
+	mockTokenURL := setup.Server.URL + "/mock-oauth/token"
+	mockRedirectURI := setup.Server.URL + "/mock-callback"
+	// Use a dedicated endpoint for tidal's user info.
+	mockUserInfoURL := setup.Server.URL + "/mock-oauth/tidal-me"
+
+	os.Setenv("ALLOWED_REDIRECT_DOMAINS", "localhost,127.0.0.1")
+	defer os.Unsetenv("ALLOWED_REDIRECT_DOMAINS")
+
+	// Mock OAuth Config for Tidal.
+	originalConfig := config.Providers["tidal"]
+	mockConfig := *originalConfig
+	mockConfig.RedirectURL = mockRedirectURI
+	mockConfig.Endpoint = oauth2.Endpoint{
+		AuthURL:  mockAuthURL,
+		TokenURL: mockTokenURL,
+	}
+	config.Providers["tidal"] = &mockConfig
+
+	// Mock GetProviderUserInfoURL for tidal.
+	originalGetProviderUserInfoURL := config.GetProviderUserInfoURL
+	config.GetProviderUserInfoURL = func(provider string) (string, error) {
+		if provider == "tidal" {
+			return mockUserInfoURL, nil
+		}
+		return "", fmt.Errorf("provider not supported")
+	}
+	defer func() { config.GetProviderUserInfoURL = originalGetProviderUserInfoURL }()
+
+	// Store PKCE data using a state token.
+	stateToken := "mock-state"
+	codeVerifier := "mock-code-verifier"
+	err := services.StorePKCEData(stateToken, codeVerifier)
+	assert.NoError(t, err)
+
+	// Set up mock endpoints.
+	router := setup.Server.Config.Handler.(*chi.Mux)
+	// Mock token exchange endpoint.
+	router.Post("/mock-oauth/token", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+			"access_token": "mocked-access-token",
+			"refresh_token": "mocked-refresh-token",
+			"expires_in": 3600,
+			"token_type": "Bearer"
+		}`))
+	})
+	// Mock tidal user info endpoint, returning the tidal response format.
+	router.Get("/mock-oauth/tidal-me", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{
+			"data": {
+				"id": "mock-user-id",
+				"attributes": {
+					"username": "TidalUser",
+					"email": "tidaluser@example.com",
+					"emailVerified": true,
+					"country": "US"
+				}
+			}
+		}`))
+	})
+
+	// Build callback URL with valid state and auth code.
+	reqURL, err := buildCallbackURL(setup.Server.URL+"/auth/tidal/callback", "mock-auth-code", stateToken+"|"+mockRedirectURI)
+	assert.NoError(t, err)
+
+	// Use a custom HTTP client that prevents following redirects.
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// Act: Call the callback endpoint.
+	resp, err := client.Get(reqURL.String())
+	assert.NoError(t, err)
+	defer resp.Body.Close()
+
+	// Assert: Verify a temporary redirect to the frontend.
+	assert.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode)
+	redirectLocation, err := resp.Location()
+	assert.NoError(t, err)
+	assert.Equal(t, mockRedirectURI, redirectLocation.String())
+
+	// Verify that a session cookie was set.
+	sessionCookie := resp.Cookies()
+	assert.NotEmpty(t, sessionCookie)
+	var cookie *http.Cookie
+	for _, c := range sessionCookie {
+		if c.Name == "session_id" {
+			cookie = c
+			break
+		}
+	}
+	assert.NotNil(t, cookie)
+
+	// Validate token storage in Redis for the tidal provider.
+	token, found := services.GetAuthToken(cookie.Value, "tidal", "mock-user-id")
 	assert.True(t, found)
 	assert.Equal(t, "mocked-access-token", token.Token.AccessToken)
 }
