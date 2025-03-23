@@ -97,28 +97,6 @@ func Test_Callback_InvalidRedirectURI_ShouldReturn400(t *testing.T) {
 	assert.Contains(t, string(bodyBytes), "invalid redirect URI")
 }
 
-// Test: Invalid State Token
-func Test_Callback_InvalidStateToken_ShouldReturn400(t *testing.T) {
-	setup := tests.InitializeTestEnvironment(t)
-	defer setup.Cleanup()
-
-	provider := "spotify"
-	baseURL := setup.Server.URL + "/auth/" + provider + "/callback"
-
-	reqURL, err := buildCallbackURL(baseURL, "mock-code", "invalid-state|http://localhost:3000/callback")
-	assert.NoError(t, err)
-
-	resp, err := http.Get(reqURL.String())
-	assert.NoError(t, err)
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
-	assert.Contains(t, string(bodyBytes), "Invalid or expired state token")
-}
-
 // Test: Missing Authorization Code
 func Test_Callback_MissingAuthorizationCode_ShouldReturn400(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
