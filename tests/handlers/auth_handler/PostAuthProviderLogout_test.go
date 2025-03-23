@@ -3,26 +3,28 @@ package auth_handler
 import (
 	"auth-service/services"
 	"auth-service/tests"
+	"auth-service/tests/mocks"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"testing"
 	"time"
-
-	"golang.org/x/oauth2"
 )
 
-// Helper to create a mock OAuth token
-func createMockOAuthToken() *oauth2.Token {
-	return &oauth2.Token{
-		AccessToken:  "mock-access-token",
-		RefreshToken: "mock-refresh-token",
-		Expiry:       time.Now().Add(time.Hour),
-	}
+// createSessionRequest prepares an HTTP request with the session cookie attached.
+func createSessionRequest(t *testing.T, method, url, sessionID string) *http.Request {
+	req, err := http.NewRequest(method, url, nil)
+	assert.NoError(t, err)
+	req.AddCookie(&http.Cookie{
+		Name:  "session_id",
+		Value: sessionID,
+		Path:  "/",
+	})
+	return req
 }
 
-// Test invalid provider handling
+// Test_PostAuthProviderLogout_InvalidProvider_ShouldReturn400 remains the same.
 func Test_PostAuthProviderLogout_InvalidProvider_ShouldReturn400(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
@@ -42,7 +44,7 @@ func Test_PostAuthProviderLogout_InvalidProvider_ShouldReturn400(t *testing.T) {
 	assert.Contains(t, string(body), "Unsupported provider")
 }
 
-// Test missing session cookie
+// Test_PostAuthProviderLogout_MissingSessionID_ShouldReturn400 remains unchanged.
 func Test_PostAuthProviderLogout_MissingSessionID_ShouldReturn400(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
@@ -62,7 +64,7 @@ func Test_PostAuthProviderLogout_MissingSessionID_ShouldReturn400(t *testing.T) 
 	assert.Contains(t, string(body), "Session ID is required")
 }
 
-// Test logging out a specific user from a provider
+// Test_PostAuthProviderLogout_SingleUser_ShouldReturn200 refactored.
 func Test_PostAuthProviderLogout_SingleUser_ShouldReturn200(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
@@ -71,41 +73,29 @@ func Test_PostAuthProviderLogout_SingleUser_ShouldReturn200(t *testing.T) {
 	provider := "spotify"
 	userID := "mock-user-1"
 
-	// Create mock user info
-	mockUser1 := &services.UserInfo{
-		ID:          userID,
-		DisplayName: "User One",
-		Email:       "user1@example.com",
-	}
-	mockUser2 := &services.UserInfo{
-		ID:          "mock-user-2",
-		DisplayName: "User Two",
-		Email:       "user2@example.com",
-	}
+	// Use mocks.NewMockUser to create mock user info.
+	mockUser1 := mocks.NewMockUser("spotify", userID, "User One", "user1@example.com")
+	mockUser2 := mocks.NewMockUser("spotify", "mock-user-2", "User Two", "user2@example.com")
 
-	// Store two mock tokens in Redis
-	err := services.StoreAuthToken(sessionID, provider, mockUser1, createMockOAuthToken())
+	// Use mocks.NewMockOAuth2Token to create tokens.
+	token := mocks.NewMockOAuth2Token("spotify", time.Hour)
+
+	// Store two mock tokens in Redis.
+	err := services.StoreAuthToken(sessionID, provider, mockUser1, token)
 	assert.NoError(t, err)
-	err = services.StoreAuthToken(sessionID, provider, mockUser2, createMockOAuthToken())
+	err = services.StoreAuthToken(sessionID, provider, mockUser2, token)
 	assert.NoError(t, err)
 
-	// Verify token exists before logout
+	// Verify token exists before logout.
 	_, found := services.GetAuthToken(sessionID, provider, userID)
 	assert.True(t, found, "Token should exist before logout")
 
-	url := setup.Server.URL + "/auth/spotify/logout?user_id=" + userID
-	req, err := http.NewRequest("POST", url, nil)
+	// Use helper to create a request with the session cookie.
+	baseURL := setup.Server.URL + "/auth/spotify/logout?user_id=" + userID
+	jar, err := cookiejar.New(nil)
 	assert.NoError(t, err)
-
-	// Attach session cookie
-	jar, _ := cookiejar.New(nil)
 	client := &http.Client{Jar: jar}
-	cookie := &http.Cookie{
-		Name:  "session_id",
-		Value: sessionID,
-		Path:  "/",
-	}
-	jar.SetCookies(req.URL, []*http.Cookie{cookie})
+	req := createSessionRequest(t, "POST", baseURL, sessionID)
 
 	resp, err := client.Do(req)
 	assert.NoError(t, err)
@@ -115,16 +105,16 @@ func Test_PostAuthProviderLogout_SingleUser_ShouldReturn200(t *testing.T) {
 
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(body), "Successfully logged out user mock-user-1")
+	assert.Contains(t, string(body), "Successfully logged out user "+userID)
 
-	// Verify that only the specified user's token was deleted
+	// Verify that only the specified user's token was deleted.
 	_, found = services.GetAuthToken(sessionID, provider, userID)
 	assert.False(t, found, "Token for logged-out user should be removed")
 	_, stillExists := services.GetAuthToken(sessionID, provider, "mock-user-2")
 	assert.True(t, stillExists, "Other user's token should still exist")
 }
 
-// Test logging out all users from a provider
+// Test_PostAuthProviderLogout_AllUsers_ShouldReturn200 refactored.
 func Test_PostAuthProviderLogout_AllUsers_ShouldReturn200(t *testing.T) {
 	setup := tests.InitializeTestEnvironment(t)
 	defer setup.Cleanup()
@@ -132,43 +122,28 @@ func Test_PostAuthProviderLogout_AllUsers_ShouldReturn200(t *testing.T) {
 	sessionID := "test-session-id"
 	provider := "spotify"
 
-	// Create mock user info
-	mockUser1 := &services.UserInfo{
-		ID:          "mock-user-1",
-		DisplayName: "User One",
-		Email:       "user1@example.com",
-	}
-	mockUser2 := &services.UserInfo{
-		ID:          "mock-user-2",
-		DisplayName: "User Two",
-		Email:       "user2@example.com",
-	}
+	// Create mock user info using mocks.
+	mockUser1 := mocks.NewMockUser("spotify", "mock-user-1", "User One", "user1@example.com")
+	mockUser2 := mocks.NewMockUser("spotify", "mock-user-2", "User Two", "user2@example.com")
 
-	// Store mock tokens for multiple users
-	err := services.StoreAuthToken(sessionID, provider, mockUser1, createMockOAuthToken())
+	// Create and store tokens using mocks.
+	token := mocks.NewMockOAuth2Token("spotify", time.Hour)
+	err := services.StoreAuthToken(sessionID, provider, mockUser1, token)
 	assert.NoError(t, err)
-	err = services.StoreAuthToken(sessionID, provider, mockUser2, createMockOAuthToken())
+	err = services.StoreAuthToken(sessionID, provider, mockUser2, token)
 	assert.NoError(t, err)
 
-	// Verify tokens exist before logout
+	// Verify tokens exist before logout.
 	_, found1 := services.GetAuthToken(sessionID, provider, "mock-user-1")
 	_, found2 := services.GetAuthToken(sessionID, provider, "mock-user-2")
 	assert.True(t, found1, "User 1 token should exist before logout")
 	assert.True(t, found2, "User 2 token should exist before logout")
 
-	url := setup.Server.URL + "/auth/spotify/logout"
-	req, err := http.NewRequest("POST", url, nil)
+	baseURL := setup.Server.URL + "/auth/spotify/logout"
+	jar, err := cookiejar.New(nil)
 	assert.NoError(t, err)
-
-	// Attach session cookie
-	jar, _ := cookiejar.New(nil)
 	client := &http.Client{Jar: jar}
-	cookie := &http.Cookie{
-		Name:  "session_id",
-		Value: sessionID,
-		Path:  "/",
-	}
-	jar.SetCookies(req.URL, []*http.Cookie{cookie})
+	req := createSessionRequest(t, "POST", baseURL, sessionID)
 
 	resp, err := client.Do(req)
 	assert.NoError(t, err)
@@ -180,7 +155,7 @@ func Test_PostAuthProviderLogout_AllUsers_ShouldReturn200(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, string(body), "Successfully logged out all users from provider spotify")
 
-	// Verify all tokens were deleted
+	// Verify all tokens were deleted.
 	_, found1 = services.GetAuthToken(sessionID, provider, "mock-user-1")
 	_, found2 = services.GetAuthToken(sessionID, provider, "mock-user-2")
 	assert.False(t, found1, "User 1 token should be removed")

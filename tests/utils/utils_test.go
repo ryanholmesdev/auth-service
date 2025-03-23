@@ -7,7 +7,21 @@ import (
 	"testing"
 )
 
-// ValidateRedirectURI tests
+func Test_ValidateRedirectURIFromEnv_ValidURI(t *testing.T) {
+	os.Setenv("ALLOWED_REDIRECT_DOMAINS", "example.com,localhost")
+	defer os.Unsetenv("ALLOWED_REDIRECT_DOMAINS")
+
+	err := utils.ValidateRedirectURIFromEnv("http://example.com/callback")
+	assert.NoError(t, err)
+}
+
+func Test_ValidateRedirectURIFromEnv_InvalidURI(t *testing.T) {
+	os.Setenv("ALLOWED_REDIRECT_DOMAINS", "example.com,localhost")
+	defer os.Unsetenv("ALLOWED_REDIRECT_DOMAINS")
+
+	err := utils.ValidateRedirectURIFromEnv("http://evil.com/callback")
+	assert.Error(t, err)
+}
 
 func Test_ValidateRedirectURI_ShouldPassForSubdomains(t *testing.T) {
 	allowedDomains := []string{"example.com"}

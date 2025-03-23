@@ -5,77 +5,75 @@ import (
 	"auth-service/services"
 	"auth-service/tests"
 	"context"
+	"encoding/json"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
 
+// setupTestRedis initializes a Redis client for testing.
 func setupTestRedis(t *testing.T) (*redis.Client, func()) {
 	client, cleanup := tests.StartRedisTestContainer(t)
 	redisclient.Client = client
 	return client, cleanup
 }
 
-// Test storing a state token
-func TestStoreStateToken_Isolated(t *testing.T) {
-	client, cleanup := setupTestRedis(t)
-	defer cleanup()
-
-	stateToken := "isolated-store-token"
-
-	err := services.StoreStateToken(stateToken)
-	assert.NoError(t, err, "Should store state token without error")
-
-	key := services.ConstructSessionKey(stateToken)
-	val, err := client.Get(context.Background(), key).Result()
-	assert.NoError(t, err)
-	assert.Equal(t, "valid", val, "Stored token should be 'valid'")
-}
-
-// Test validating a state token
-func TestValidateStateToken_Isolated(t *testing.T) {
+func TestStorePKCEData_Isolated(t *testing.T) {
 	_, cleanup := setupTestRedis(t)
 	defer cleanup()
 
-	stateToken := "isolated-validate-token"
+	stateToken := "isolated-store-token"
+	codeVerifier := "test-code-verifier"
 
-	_ = services.StoreStateToken(stateToken)
+	// Explicitly call the function from the services package.
+	err := services.StorePKCEData(stateToken, codeVerifier)
+	assert.NoError(t, err, "Should store PKCE data without error")
 
-	isValid := services.ValidateStateToken(stateToken)
-	assert.True(t, isValid, "State token should be valid")
+	// Retrieve the stored code verifier.
+	retrievedVerifier, err := services.GetCodeVerifier(stateToken)
+	assert.NoError(t, err)
+	assert.Equal(t, codeVerifier, retrievedVerifier, "Stored code verifier should match")
 }
 
-// Test deleting a state token
-func TestDeleteStateToken_Isolated(t *testing.T) {
+func TestDeletePKCEData_Isolated(t *testing.T) {
 	_, cleanup := setupTestRedis(t)
 	defer cleanup()
 
 	stateToken := "isolated-delete-token"
+	codeVerifier := "test-code-verifier"
 
-	_ = services.StoreStateToken(stateToken)
-
-	err := services.DeleteStateToken(stateToken)
+	// Store the PKCE data.
+	err := services.StorePKCEData(stateToken, codeVerifier)
 	assert.NoError(t, err)
 
-	isValid := services.ValidateStateToken(stateToken)
-	assert.False(t, isValid, "Deleted token should not be valid")
+	// Delete the stored PKCE data.
+	err = services.DeletePKCEData(stateToken)
+	assert.NoError(t, err)
+
+	// Attempt to retrieve the data after deletion; should result in an error.
+	_, err = services.GetCodeVerifier(stateToken)
+	assert.Error(t, err, "Expected error when retrieving deleted PKCE data")
 }
 
-// Test expired state token
-func TestValidateStateToken_Expires_Isolated(t *testing.T) {
+func TestStorePKCEData_Expires_Isolated(t *testing.T) {
 	client, cleanup := setupTestRedis(t)
 	defer cleanup()
 
 	stateToken := "isolated-expire-token"
+	codeVerifier := "test-code-verifier"
+	key := "pkce:" + stateToken
 
-	// Store with short TTL
-	key := services.ConstructSessionKey(stateToken)
-	err := client.Set(context.Background(), key, "valid", 2*time.Second).Err()
+	// Manually marshal the data and set it with a short TTL (2 seconds).
+	data := services.PKCEData{CodeVerifier: codeVerifier}
+	b, err := json.Marshal(data)
+	assert.NoError(t, err)
+	err = client.Set(context.Background(), key, b, 2*time.Second).Err()
 	assert.NoError(t, err)
 
+	// Wait for the key to expire.
 	time.Sleep(3 * time.Second)
 
-	isValid := services.ValidateStateToken(stateToken)
-	assert.False(t, isValid, "Expired state token should not be valid")
+	_, err = services.GetCodeVerifier(stateToken)
+	assert.Error(t, err, "Expired PKCE data should not be retrievable")
 }

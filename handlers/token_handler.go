@@ -3,6 +3,7 @@ package handlers
 import (
 	"auth-service/config"
 	"auth-service/generated"
+	"auth-service/models"
 	"auth-service/services"
 	"auth-service/utils"
 	"encoding/json"
@@ -55,7 +56,7 @@ func (s *Server) GetAuthProviderToken(w http.ResponseWriter, r *http.Request, pr
 		}
 
 		// Update the token in storage
-		err = services.StoreAuthToken(sessionCookie.Value, provider, userInfo, newToken)
+		err = services.StoreAuthToken(sessionCookie.Value, provider, (*models.UserInfo)(userInfo), newToken)
 
 		token.Token = newToken
 	}
