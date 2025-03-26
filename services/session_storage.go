@@ -4,6 +4,7 @@ import (
 	"auth-service/redisclient"
 	"context"
 	"encoding/json"
+	"github.com/monzo/slog"
 	"log"
 	"time"
 )
@@ -26,6 +27,9 @@ var StorePKCEData = func(stateToken, codeVerifier string) error {
 	err = redisclient.Client.Set(context.Background(), key, b, time.Minute*5).Err()
 	if err != nil {
 		log.Printf("Failed to store PKCE data in Redis: %v", err)
+		slog.Error(context.Background(), "Failed to store PKCE data in Redis", err, map[string]interface{}{
+			"state_token": stateToken,
+		})
 		return err
 	}
 	return nil
@@ -37,6 +41,9 @@ func GetCodeVerifier(stateToken string) (string, error) {
 	result, err := redisclient.Client.Get(context.Background(), key).Result()
 	if err != nil {
 		log.Printf("Failed to retrieve PKCE data from Redis: %v", err)
+		slog.Error(context.Background(), "Failed to retrieve PKCE data from Redis", err, map[string]interface{}{
+			"state_token": stateToken,
+		})
 		return "", err
 	}
 	var data PKCEData
@@ -52,6 +59,9 @@ func DeletePKCEData(stateToken string) error {
 	err := redisclient.Client.Del(context.Background(), key).Err()
 	if err != nil {
 		log.Printf("Failed to delete PKCE data from Redis: %v", err)
+		slog.Error(context.Background(), "Failed to delete PKCE data from Redis", err, map[string]interface{}{
+			"state_token": stateToken,
+		})
 		return err
 	}
 	return nil
