@@ -6,10 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/oauth2"
+	"github.com/monzo/slog"
 	"log"
 	"strings"
 	"time"
+
+	"golang.org/x/oauth2"
 )
 
 // Constructs a Redis key for storing OAuth tokens per session, provider, and user ID
@@ -40,6 +42,11 @@ func StoreAuthToken(sessionID, provider string, userInfo *models.UserInfo, token
 	authDataJSON, err := json.Marshal(authData)
 	if err != nil {
 		log.Printf("Failed to serialize auth data: %v", err)
+		slog.Error(context.Background(), "Failed to serialize auth data", err, map[string]interface{}{
+			"session_id": sessionID,
+			"provider":   provider,
+			"user_id":    userInfo.ID,
+		})
 		return err
 	}
 
@@ -47,10 +54,20 @@ func StoreAuthToken(sessionID, provider string, userInfo *models.UserInfo, token
 	err = redisclient.Client.Set(context.Background(), key, authDataJSON, time.Until(token.Expiry)).Err()
 	if err != nil {
 		log.Printf("Failed to store auth data in Redis: %v", err)
+		slog.Error(context.Background(), "Failed to store auth data in Redis", err, map[string]interface{}{
+			"session_id": sessionID,
+			"provider":   provider,
+			"user_id":    userInfo.ID,
+		})
 		return err
 	}
 
 	log.Printf("Stored auth data in Redis for session %s, provider %s, user %s", sessionID, provider, userInfo.ID)
+	slog.Info(context.Background(), "Stored auth data in Redis", map[string]interface{}{
+		"session_id": sessionID,
+		"provider":   provider,
+		"user_id":    userInfo.ID,
+	})
 	return nil
 }
 
@@ -62,6 +79,11 @@ func GetAuthToken(sessionID, provider, userID string) (*AuthData, bool) {
 	authDataJSON, err := redisclient.Client.Get(context.Background(), key).Result()
 	if err != nil {
 		log.Printf("Failed to retrieve auth data from Redis: %v", err)
+		slog.Error(context.Background(), "Failed to retrieve auth data from Redis", err, map[string]interface{}{
+			"session_id": sessionID,
+			"provider":   provider,
+			"user_id":    userID,
+		})
 		return nil, false
 	}
 
@@ -70,6 +92,11 @@ func GetAuthToken(sessionID, provider, userID string) (*AuthData, bool) {
 	err = json.Unmarshal([]byte(authDataJSON), &authData)
 	if err != nil {
 		log.Printf("Failed to deserialize auth data: %v", err)
+		slog.Error(context.Background(), "Failed to deserialize auth data", err, map[string]interface{}{
+			"session_id": sessionID,
+			"provider":   provider,
+			"user_id":    userID,
+		})
 		return nil, false
 	}
 
@@ -91,6 +118,9 @@ func GetLoggedInProviders(sessionID string) ([]LoggedInProvider, error) {
 	keys, err := redisclient.Client.Keys(context.Background(), pattern).Result()
 	if err != nil {
 		log.Printf("Failed to fetch keys from Redis: %v", err)
+		slog.Error(context.Background(), "Failed to fetch keys from Redis", err, map[string]interface{}{
+			"session_id": sessionID,
+		})
 		return nil, err
 	}
 
@@ -134,10 +164,20 @@ func DeleteAuthToken(sessionID, provider, userID string) error {
 	err := redisclient.Client.Del(context.Background(), key).Err()
 	if err != nil {
 		log.Printf("Failed to delete token from Redis: %v", err)
+		slog.Error(context.Background(), "Failed to delete token from Redis", err, map[string]interface{}{
+			"session_id": sessionID,
+			"provider":   provider,
+			"user_id":    userID,
+		})
 		return err
 	}
 
 	log.Printf("Token deleted from Redis for session %s, provider %s, user %s", sessionID, provider, userID)
+	slog.Info(context.Background(), "Token deleted from Redis", map[string]interface{}{
+		"session_id": sessionID,
+		"provider":   provider,
+		"user_id":    userID,
+	})
 	return nil
 }
 
@@ -146,6 +186,10 @@ func DeleteAllAuthTokensForProvider(sessionID, provider string) error {
 	keys, err := redisclient.Client.Keys(context.Background(), pattern).Result()
 	if err != nil {
 		log.Printf("Failed to fetch keys for logout: %v", err)
+		slog.Error(context.Background(), "Failed to fetch keys for logout", err, map[string]interface{}{
+			"session_id": sessionID,
+			"provider":   provider,
+		})
 		return err
 	}
 
@@ -156,9 +200,16 @@ func DeleteAllAuthTokensForProvider(sessionID, provider string) error {
 	err = redisclient.Client.Del(context.Background(), keys...).Err()
 	if err != nil {
 		log.Printf("Failed to delete keys for provider %s: %v", provider, err)
+		slog.Error(context.Background(), "Failed to delete keys for provider", err, map[string]interface{}{
+			"session_id": sessionID,
+			"provider":   provider,
+		})
 		return err
 	}
 
 	log.Printf("Successfully deleted all tokens for provider %s", provider)
+	slog.Info(context.Background(), "Successfully deleted all tokens for provider", map[string]interface{}{
+		"provider": provider,
+	})
 	return nil
 }

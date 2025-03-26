@@ -5,15 +5,19 @@ import (
 	"auth-service/generated"
 	"auth-service/handlers"
 	"auth-service/redisclient"
+	"context"
 	"encoding/json"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/cors"
-	"github.com/joho/godotenv"
-	httpSwagger "github.com/swaggo/http-swagger"
+	"fmt"
+	"github.com/monzo/slog"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
+	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func InitializeServer() http.Handler {
@@ -26,12 +30,17 @@ func InitializeServer() http.Handler {
 	envPath := filepath.Join(".env." + appEnv)
 	if err := godotenv.Load(envPath); err != nil {
 		log.Printf("Warning: No %s file found. Using system environment variables.", envPath)
+		slog.Warn(context.Background(), "No .env file found", map[string]interface{}{
+			"env_path": envPath,
+		})
 	}
 
 	// Initialize Redis
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		log.Fatal("REDIS_ADDR environment variable is not set")
+		slog.Error(context.Background(), "REDIS_ADDR environment variable is not set", fmt.Errorf("missing environment variable"), nil)
+		os.Exit(1)
 	}
 
 	redisclient.InitializeRedis(redisAddr)
@@ -58,6 +67,7 @@ func InitializeServer() http.Handler {
 	r.Mount("/", generated.HandlerFromMux(server, r))
 
 	log.Println("Server started successfully")
+	slog.Info(context.Background(), "Server started successfully", nil)
 
 	return r
 }
@@ -67,12 +77,14 @@ func setupSwagger(r *chi.Mux) {
 		swagger, err := generated.GetSwagger()
 		if err != nil {
 			log.Println("Failed to load OpenAPI spec:", err)
+			slog.Error(r.Context(), "Failed to load OpenAPI spec", err, nil)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		jsonBytes, err := json.Marshal(swagger)
 		if err != nil {
 			log.Println("Failed to marshal OpenAPI spec:", err)
+			slog.Error(r.Context(), "Failed to marshal OpenAPI spec", err, nil)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
