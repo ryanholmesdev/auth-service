@@ -5,18 +5,22 @@ import (
 	"auth-service/generated"
 	"auth-service/handlers"
 	"auth-service/redisclient"
+	"auth-service/utils"
+	"context"
 	"encoding/json"
+	"net/http"
+	"os"
+	"path/filepath"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 	"github.com/joho/godotenv"
 	httpSwagger "github.com/swaggo/http-swagger"
-	"log"
-	"net/http"
-	"os"
-	"path/filepath"
 )
 
 func InitializeServer() http.Handler {
+	ctx := context.Background()
+
 	// Load environment variables
 	appEnv := os.Getenv("APP_ENV")
 	if appEnv == "" {
@@ -25,13 +29,19 @@ func InitializeServer() http.Handler {
 
 	envPath := filepath.Join(".env." + appEnv)
 	if err := godotenv.Load(envPath); err != nil {
-		log.Printf("Warning: No %s file found. Using system environment variables.", envPath)
+		utils.LogWarn(ctx, "No environment file found", map[string]interface{}{
+			"env_path": envPath,
+			"error":    err.Error(),
+		})
 	}
 
 	// Initialize Redis
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
-		log.Fatal("REDIS_ADDR environment variable is not set")
+		utils.LogError(ctx, "Redis address not configured", nil, map[string]interface{}{
+			"error": "REDIS_ADDR environment variable is not set",
+		})
+		os.Exit(1)
 	}
 
 	redisclient.InitializeRedis(redisAddr)
@@ -57,22 +67,26 @@ func InitializeServer() http.Handler {
 	server := &handlers.Server{}
 	r.Mount("/", generated.HandlerFromMux(server, r))
 
-	log.Println("Server started successfully")
+	utils.LogInfo(ctx, "Server started successfully", map[string]interface{}{
+		"env": appEnv,
+	})
 
 	return r
 }
 
 func setupSwagger(r *chi.Mux) {
+	ctx := context.Background()
+
 	r.Get("/swagger/doc.json", func(w http.ResponseWriter, r *http.Request) {
 		swagger, err := generated.GetSwagger()
 		if err != nil {
-			log.Println("Failed to load OpenAPI spec:", err)
+			utils.LogError(ctx, "Failed to load OpenAPI spec", err, nil)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		jsonBytes, err := json.Marshal(swagger)
 		if err != nil {
-			log.Println("Failed to marshal OpenAPI spec:", err)
+			utils.LogError(ctx, "Failed to marshal OpenAPI spec", err, nil)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
