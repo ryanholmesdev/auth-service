@@ -5,18 +5,23 @@ import (
 	"auth-service/generated"
 	"auth-service/handlers"
 	"auth-service/redisclient"
+	"context"
 	"encoding/json"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/cors"
-	"github.com/joho/godotenv"
-	httpSwagger "github.com/swaggo/http-swagger"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
+	"github.com/joho/godotenv"
+	"github.com/monzo/slog"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 func InitializeServer() http.Handler {
+	ctx := context.Background()
 	// Load environment variables
 	appEnv := os.Getenv("APP_ENV")
 	if appEnv == "" {
@@ -25,17 +30,24 @@ func InitializeServer() http.Handler {
 
 	envPath := filepath.Join(".env." + appEnv)
 	if err := godotenv.Load(envPath); err != nil {
-		log.Printf("Warning: No %s file found. Using system environment variables.", envPath)
+		slog.Warn(ctx, "No environment file found", map[string]interface{}{
+			"env_path": envPath,
+		})
 	}
 
 	// Initialize Redis
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
-		log.Fatal("REDIS_ADDR environment variable is not set")
+		slog.Error(ctx, "REDIS_ADDR environment variable is not set", fmt.Errorf("missing environment variable"))
+		os.Exit(1)
 	}
 
+	slog.Info(ctx, "Initializing Redis connection", map[string]interface{}{
+		"redis_addr": redisAddr,
+	})
 	redisclient.InitializeRedis(redisAddr)
 
+	slog.Info(ctx, "Initializing configuration")
 	config.InitConfig()
 
 	// Setup Router

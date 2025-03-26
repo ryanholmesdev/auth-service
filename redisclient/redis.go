@@ -2,14 +2,17 @@ package redisclient
 
 import (
 	"context"
-	"github.com/redis/go-redis/v9"
-	"log"
+	"fmt"
 	"time"
+
+	"github.com/monzo/slog"
+	"github.com/redis/go-redis/v9"
 )
 
 var Client *redis.Client
 
 func InitializeRedis(redisAddr string) {
+	ctx := context.Background()
 	Client = redis.NewClient(&redis.Options{
 		Addr: redisAddr,
 	})
@@ -17,14 +20,24 @@ func InitializeRedis(redisAddr string) {
 	// Retry connection for a certain duration
 	maxRetries := 5
 	for i := 0; i < maxRetries; i++ {
-		err := Client.Ping(context.Background()).Err()
+		err := Client.Ping(ctx).Err()
 		if err == nil {
-			log.Println("Connected to Redis successfully.")
+			slog.Info(ctx, "Connected to Redis successfully", map[string]interface{}{
+				"redis_addr": redisAddr,
+			})
 			return
 		}
-		log.Printf("Failed to connect to Redis (attempt %d/%d): %v", i+1, maxRetries, err)
+		slog.Warn(ctx, "Failed to connect to Redis", err, map[string]interface{}{
+			"attempt":     i + 1,
+			"max_retries": maxRetries,
+			"redis_addr":  redisAddr,
+		})
 		time.Sleep(2 * time.Second) // Wait before retrying
 	}
 
-	log.Fatalf("Failed to connect to Redis after %d attempts", maxRetries)
+	slog.Error(ctx, "Failed to connect to Redis after maximum retries", fmt.Errorf("connection failed"), map[string]interface{}{
+		"max_retries": maxRetries,
+		"redis_addr":  redisAddr,
+	})
+	panic("Failed to connect to Redis after maximum retries")
 }

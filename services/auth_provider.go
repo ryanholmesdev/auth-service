@@ -9,6 +9,7 @@ import (
 	"auth-service/models"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/monzo/slog"
 	"golang.org/x/oauth2"
 )
 
@@ -25,15 +26,26 @@ func makeAuthenticatedRequest[T any, P interface {
 	var result T
 	client := getClient()
 
+	slog.Info(ctx, "Making authenticated request to provider", map[string]interface{}{
+		"url": url,
+	})
+
 	resp, err := client.R().
 		SetContext(ctx).
 		SetHeader("Authorization", "Bearer "+token.AccessToken).
 		SetResult(&result).
 		Get(url)
 	if err != nil {
+		slog.Error(ctx, "Failed to make authenticated request", err, map[string]interface{}{
+			"url": url,
+		})
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	if resp.StatusCode() != http.StatusOK {
+		slog.Error(ctx, "Provider returned non-OK status", fmt.Errorf("status code: %d", resp.StatusCode()), map[string]interface{}{
+			"url":         url,
+			"status_code": resp.StatusCode(),
+		})
 		return nil, fmt.Errorf("provider returned non-OK status: %d", resp.StatusCode())
 	}
 	return P(&result), nil
@@ -44,8 +56,16 @@ func makeAuthenticatedRequest[T any, P interface {
 func GetUserInfo(ctx context.Context, provider string, token *oauth2.Token) (*models.UserInfo, error) {
 	url, err := config.GetProviderUserInfoURL(provider)
 	if err != nil {
+		slog.Error(ctx, "Failed to get provider user info URL", err, map[string]interface{}{
+			"provider": provider,
+		})
 		return nil, fmt.Errorf("failed to get provider user info URL: %w", err)
 	}
+
+	slog.Info(ctx, "Fetching user info from provider", map[string]interface{}{
+		"provider": provider,
+		"url":      url,
+	})
 
 	var response models.ProviderResponse
 
@@ -65,10 +85,29 @@ func GetUserInfo(ctx context.Context, provider string, token *oauth2.Token) (*mo
 		response = tidalUser
 
 	default:
-		return nil, fmt.Errorf("unsupported provider: %s", provider)
+		err := fmt.Errorf("unsupported provider: %s", provider)
+		slog.Error(ctx, "Unsupported provider", err, map[string]interface{}{
+			"provider": provider,
+		})
+		return nil, err
 	}
 
-	return response.ToUserInfo()
+	userInfo, err := response.ToUserInfo()
+	if err != nil {
+		slog.Error(ctx, "Failed to convert provider response to user info", err, map[string]interface{}{
+			"provider": provider,
+		})
+		return nil, err
+	}
+
+	slog.Info(ctx, "Successfully retrieved user info", map[string]interface{}{
+		"provider":     provider,
+		"user_id":      userInfo.ID,
+		"display_name": userInfo.DisplayName,
+		"email":        userInfo.Email,
+	})
+
+	return userInfo, nil
 }
 
 // UserInfo is our normalized user info structure

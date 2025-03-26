@@ -1,16 +1,21 @@
 package config
 
 import (
+	"context"
 	"fmt"
-	"golang.org/x/oauth2"
-	"log"
 	"os"
 	"strings"
+
+	"github.com/monzo/slog"
+	"golang.org/x/oauth2"
 )
 
 var Providers map[string]*oauth2.Config
 
 func InitConfig() {
+	ctx := context.Background()
+	slog.Info(ctx, "Initializing OAuth providers configuration")
+
 	Providers = map[string]*oauth2.Config{
 		"spotify": {
 			ClientID:     getEnv("SPOTIFY_CLIENT_ID", ""),
@@ -45,26 +50,54 @@ func getEnv(key, fallback string) string {
 }
 
 func validateProviders() {
+	ctx := context.Background()
 	for name, config := range Providers {
 		if config.ClientID == "" {
-			log.Fatalf("Missing environment variable for: %s_CLIENT_ID", strings.ToUpper(name))
+			slog.Error(ctx, "Missing environment variable", fmt.Errorf("missing client ID"), map[string]interface{}{
+				"provider": name,
+				"var":      fmt.Sprintf("%s_CLIENT_ID", strings.ToUpper(name)),
+			})
+			panic(fmt.Sprintf("Missing environment variable for: %s_CLIENT_ID", strings.ToUpper(name)))
 		}
 		if config.ClientSecret == "" {
-			log.Fatalf("Missing environment variable for: %s_CLIENT_SECRET", strings.ToUpper(name))
+			slog.Error(ctx, "Missing environment variable", fmt.Errorf("missing client secret"), map[string]interface{}{
+				"provider": name,
+				"var":      fmt.Sprintf("%s_CLIENT_SECRET", strings.ToUpper(name)),
+			})
+			panic(fmt.Sprintf("Missing environment variable for: %s_CLIENT_SECRET", strings.ToUpper(name)))
 		}
 		if config.RedirectURL == "" {
-			log.Fatalf("Missing environment variable for: %s_REDIRECT_URL", strings.ToUpper(name))
+			slog.Error(ctx, "Missing environment variable", fmt.Errorf("missing redirect URL"), map[string]interface{}{
+				"provider": name,
+				"var":      fmt.Sprintf("%s_REDIRECT_URL", strings.ToUpper(name)),
+			})
+			panic(fmt.Sprintf("Missing environment variable for: %s_REDIRECT_URL", strings.ToUpper(name)))
 		}
 	}
+	slog.Info(ctx, "Successfully validated all provider configurations", map[string]interface{}{
+		"providers": getProviderNames(),
+	})
+}
+
+func getProviderNames() []string {
+	names := make([]string, 0, len(Providers))
+	for name := range Providers {
+		names = append(names, name)
+	}
+	return names
 }
 
 var GetProviderUserInfoURL = func(provider string) (string, error) {
+	ctx := context.Background()
 	switch provider {
 	case "spotify":
 		return "https://api.spotify.com/v1/me", nil
 	case "tidal":
 		return "https://openapi.tidal.com/v2/users/me", nil
 	default:
+		slog.Error(ctx, "Unsupported provider", fmt.Errorf("provider not supported"), map[string]interface{}{
+			"provider": provider,
+		})
 		return "", fmt.Errorf("provider not supported: %s", provider)
 	}
 }
